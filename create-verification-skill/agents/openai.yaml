@@ -1,0 +1,6 @@
+interface:
+  display_name: "Create Verification Skill"
+  short_description: "Create a project skill for live app verification"
+
+policy:
+  allow_implicit_invocation: false

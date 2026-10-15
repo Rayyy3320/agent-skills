@@ -1,0 +1,7 @@
+interface:
+  display_name: "UI Design Guide"
+  short_description: "按需提供界面构图、排版、交互和素材指导，相关设计任务可自动调用"
+  default_prompt: "使用 $ui-design-guide，按当前界面问题选读设计知识并应用，不自动展开全套验收流程。"
+
+policy:
+  allow_implicit_invocation: true
