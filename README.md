@@ -14,7 +14,7 @@ Each skill is a directory containing a `SKILL.md` (front-matter metadata + instr
 | [`create-verification-skill`](./create-verification-skill) | Generate a project-local verification skill that drives your app the way a user does. |
 | [`css-native`](./css-native) | Build zero-dependency web motion and visual effects with modern CSS. |
 | [`design-dna`](./design-dna) | Extract a reference design into structured Design DNA — tokens, qualitative style, and visual effects — or apply an existing DNA JSON to new content. |
-| [`doc-steward`](./doc-steward) | 对齐新方案与已有决策及项目文档，审计或修复文档职责、冲突、重复和失效信息。 |
+| [`doc-steward`](./doc-steward) | 治理或选择项目文档体系，协调新方案与已有决策及多份文档的职责，审计或修复文档冲突、重复、过时和职责漂移。 |
 | [`draw-ui`](./draw-ui) | 设计 App、后台、游戏界面或完整落地页，并按需还原为 HTML/CSS、现有前端项目或微信小程序。 |
 | [`maintain-verification-skill`](./maintain-verification-skill) | Audit and update a project's verification skill and feature map through source inspection and live feature verification. |
 | [`oil-icon`](./oil-icon) | 通过宫格生图、切分和去背景制作风格统一的透明 PNG 图标集合。 |
