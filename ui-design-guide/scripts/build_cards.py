@@ -10,6 +10,7 @@ import math
 from pathlib import Path
 import re
 import struct
+import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -56,7 +57,7 @@ def land_mask() -> None:
     (CARDS / 'shared/land-mask.js').write_text(
         '// Generated from Natural Earth 110m land (public domain).\n'
         f'export const LAND_WIDTH = {width};\nexport const LAND_HEIGHT = {height};\n'
-        f'export const LAND_BITS = "{encoded}";\n', encoding='utf-8')
+        f'export const LAND_BITS = "{encoded}";\n', encoding='utf-8', newline='\n')
 
 
 def bundle(path: Path) -> str:
@@ -73,7 +74,15 @@ def bundle(path: Path) -> str:
     return f'modules["{key}"] = (() => {{\n{source}\nreturn {{{", ".join(exports)}}};\n}})();'
 
 
+def utf8_output() -> None:
+    """管道另一头按 UTF-8 读；控制台的代码页可能连中文都没有。"""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure') and not stream.isatty():
+            stream.reconfigure(encoding='utf-8')
+
+
 def main(argv: list[str] | None = None) -> None:
+    utf8_output()
     parser = argparse.ArgumentParser(
         description='维护卡片库时用：把 assets/cards/ 下各个卡片原型重新打包成 assets/cards/gallery.html。',
         epilog='不带参数运行。它会直接改写 Skill 目录里的 gallery.html，所以只在改过卡片原型的源文件之后运行；'
@@ -98,7 +107,7 @@ def main(argv: list[str] | None = None) -> None:
     html = re.sub(r'src="((?:showcase|portrait-story)/images/[^"<>]+)"', embed_image, html)
     if re.search(r'\{\{[\w-]+\}\}', html):
         raise ValueError('Unresolved template slot')
-    (CARDS / 'gallery.html').write_text(html, encoding='utf-8')
+    (CARDS / 'gallery.html').write_text(html, encoding='utf-8', newline='\n')
     print(f'Built assets/cards/gallery.html · {len(html.encode()):,} bytes · {len(NAMES)} templates')
 
 

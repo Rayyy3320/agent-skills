@@ -14,7 +14,7 @@ GALLERY = ROOT / "assets" / "cards" / "gallery.html"
 @unittest.skipUnless(SCRIPT.is_file() and GALLERY.is_file(), "card gallery is not part of this edition")
 class CardGalleryBuilderTests(unittest.TestCase):
     def run_script(self, *args):
-        return subprocess.run([sys.executable, str(SCRIPT), *args], capture_output=True, text=True)
+        return subprocess.run([sys.executable, str(SCRIPT), *args], capture_output=True, text=True, encoding="utf-8")
 
     def test_help_explains_the_script_without_rebuilding(self):
         before = GALLERY.stat().st_mtime_ns

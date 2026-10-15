@@ -57,8 +57,8 @@ process.stdout.write(eval(writer+'; screencastList(frames,finished)'));'''
             frames = [{'name': name + '.jpg', 't': t} for name, t in
                       [('red', 0), ('blue', .949), ('green', .965), ('blue', 2.13)]]
             result = subprocess.run([NODE, '--input-type=module', '-e', javascript, str(SCRIPT), json.dumps(frames), '2.146'],
-                                    check=True, capture_output=True, text=True, timeout=10)
-            (folder / 'list.txt').write_text(result.stdout)
+                                    check=True, capture_output=True, text=True, timeout=10, encoding='utf-8')
+            (folder / 'list.txt').write_text(result.stdout, encoding='utf-8')
             video = folder / 'record.mp4'
             subprocess.run(['ffmpeg', '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i',
                             str(folder / 'list.txt'), '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=30',
@@ -75,8 +75,8 @@ process.stdout.write(eval(writer+'; screencastList(frames,finished)'));'''
             # The end screenshot must also survive an ending halfway between output ticks.
             tail_frames = [{'name': 'red.jpg', 't': 0}, {'name': 'blue.jpg', 't': .950}]
             result = subprocess.run([NODE, '--input-type=module', '-e', javascript, str(SCRIPT),
-                                     json.dumps(tail_frames), '.950'], check=True, capture_output=True, text=True, timeout=10)
-            (folder / 'list.txt').write_text(result.stdout)
+                                     json.dumps(tail_frames), '.950'], check=True, capture_output=True, text=True, timeout=10, encoding='utf-8')
+            (folder / 'list.txt').write_text(result.stdout, encoding='utf-8')
             subprocess.run(['ffmpeg', '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i',
                             str(folder / 'list.txt'), '-vf', 'fps=30', '-pix_fmt', 'yuv420p', str(video)],
                            check=True, capture_output=True, timeout=10)
@@ -87,7 +87,7 @@ process.stdout.write(eval(writer+'; screencastList(frames,finished)'));'''
 
     def test_help(self):
         result = subprocess.run([NODE, str(SCRIPT), "--help"], cwd=ROOT,
-                                capture_output=True, text=True, timeout=10)
+                                capture_output=True, text=True, timeout=10, encoding='utf-8')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("用法", result.stdout)
         self.assertIn("type 在当前光标处插入文字", result.stdout)
@@ -100,7 +100,7 @@ process.stdout.write(eval(writer+'; screencastList(frames,finished)'));'''
     def test_help_carries_the_reference_and_report_structure_example(self):
         """参考内容放在 --help 里；references/tools.md 只讲什么时候用，并指到这里。"""
         documentation = subprocess.run([NODE, str(SCRIPT), "--help"], cwd=ROOT,
-                                       capture_output=True, text=True, timeout=10).stdout
+                                       capture_output=True, text=True, timeout=10, encoding='utf-8').stdout
         self.assertIn('最外层是数组', documentation)
         self.assertIn('不是把页面放大到 200% 后的重排', documentation)
         self.assertIn('录屏短于 3 秒是正常的', documentation)
@@ -123,25 +123,25 @@ process.stdout.write(eval(writer+'; screencastList(frames,finished)'));'''
                 message = self.dry('--timeout-scale', value, ok=False)
                 self.assertIn('收到 ' + value, message)
                 self.assertIn('--timeout-scale 2', message)
-        result = subprocess.run([NODE, str(SCRIPT), '--help'], capture_output=True, text=True, timeout=10)
+        result = subprocess.run([NODE, str(SCRIPT), '--help'], capture_output=True, text=True, timeout=10, encoding='utf-8')
         self.assertIn('90 秒', result.stdout)
         self.assertIn('--timeout-scale', result.stdout)
 
     def test_missing_target(self):
         result = subprocess.run([NODE, str(SCRIPT)], cwd=ROOT,
-                                capture_output=True, text=True, timeout=10)
+                                capture_output=True, text=True, timeout=10, encoding='utf-8')
         self.assertNotEqual(result.returncode, 0)
 
     def test_unknown_option(self):
         help_result = subprocess.run([NODE, str(SCRIPT), "--help"], cwd=ROOT,
-                                     capture_output=True, text=True, timeout=10)
+                                     capture_output=True, text=True, timeout=10, encoding='utf-8')
         self.assertEqual(help_result.returncode, 0, help_result.stderr)
         options = [line.split()[0] for line in help_result.stdout.splitlines()
                    if line.startswith("  --")]
         for args in (("--xxx",), ("--xxx", "value")):
             with self.subTest(args=args):
                 result = subprocess.run([NODE, str(SCRIPT), *args], cwd=ROOT,
-                                        capture_output=True, text=True, timeout=10)
+                                        capture_output=True, text=True, timeout=10, encoding='utf-8')
                 self.assertEqual(result.returncode, 1)
                 self.assertIn("不认识的选项 --xxx", result.stderr)
                 self.assertIn("是不是想写", result.stderr)
@@ -153,19 +153,19 @@ process.stdout.write(eval(writer+'; screencastList(frames,finished)'));'''
             for following in ((), ("--force",)):
                 with self.subTest(option=option, following=following):
                     result = subprocess.run([NODE, str(SCRIPT), option, *following], cwd=ROOT,
-                                            capture_output=True, text=True, timeout=10)
+                                            capture_output=True, text=True, timeout=10, encoding='utf-8')
                     self.assertEqual(result.returncode, 1)
                     self.assertEqual(result.stderr, f"shoot：{option} 需要一个值\n")
 
     def test_force_is_ignored(self):
         result = subprocess.run([NODE, str(SCRIPT), "--force"], cwd=ROOT,
-                                capture_output=True, text=True, timeout=10)
+                                capture_output=True, text=True, timeout=10, encoding='utf-8')
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stderr, "shoot：缺少页面地址或文件。\n")
 
     def dry(self, *args, ok=True):
         result = subprocess.run([NODE, str(SCRIPT), "page.html", "--dry-run", *args],
-                                cwd=ROOT, capture_output=True, text=True, timeout=10)
+                                cwd=ROOT, capture_output=True, text=True, timeout=10, encoding='utf-8')
         self.assertEqual(result.returncode, 0 if ok else 1, result.stdout + result.stderr)
         return json.loads(result.stdout) if ok else result.stderr
 
@@ -242,14 +242,14 @@ process.stdout.write(eval(writer+'; screencastList(frames,finished)'));'''
             env = dict(os.environ, CHROME_PATH=str(Path(folder) / "no-browser"))
             args = [NODE, str(SCRIPT), "missing-page.html", "--out", str(output)]
             result = subprocess.run([*args, "--dry-run", "--steps", "click .nav button"],
-                                    cwd=ROOT, env=env, capture_output=True, text=True, timeout=10)
+                                    cwd=ROOT, env=env, capture_output=True, text=True, timeout=10, encoding='utf-8')
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(json.loads(result.stdout)["groups"][0]["steps"][0]["selector"]["kind"], "css")
             self.assertFalse(output.exists())
             errors = []
             for extra in ([], ["--dry-run"]):
                 result = subprocess.run([*args, *extra, "--steps", "drag .tile 20 nope"],
-                                        cwd=ROOT, env=env, capture_output=True, text=True, timeout=10)
+                                        cwd=ROOT, env=env, capture_output=True, text=True, timeout=10, encoding='utf-8')
                 self.assertEqual(result.returncode, 1)
                 errors.append(result.stderr)
             self.assertEqual(errors[0], errors[1])
@@ -327,9 +327,35 @@ document.querySelector('#go').onclick = () => show(document.body.dataset.state =
 
     def shoot(self, output, *args):
         result = subprocess.run([NODE, str(SCRIPT), str(self.page), "--out", str(output), *args],
-                                cwd=ROOT, env=self.env, capture_output=True, text=True, timeout=90)
+                                cwd=ROOT, env=self.env, capture_output=True, text=True, timeout=90, encoding='utf-8')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result
+
+    def browser_leftovers(self):
+        """Processes still holding this test's temporary profiles, and the profile folders themselves."""
+        import time
+        needle = self.folder.name
+        for _ in range(40):
+            if sys.platform == 'win32':
+                script = ("Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -and "
+                          "$_.CommandLine.Contains('" + needle + "') -and $_.CommandLine.Contains('user-data-dir') } | ForEach-Object { $_.Name }")
+                found = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', script],
+                                       capture_output=True, text=True, timeout=60, encoding='utf-8', errors='replace').stdout.split()
+            else:
+                # Other programs' command lines are not ours to decode strictly; only our own folder name matters here.
+                listing = subprocess.run(['ps', '-axww', '-o', 'command='], capture_output=True, text=True,
+                                         encoding='utf-8', errors='replace').stdout
+                found = [line[:120] for line in listing.splitlines() if needle in line and '--user-data-dir=' in line]
+            folders = [path.name for path in self.profile_root.glob('oil-shoot-*')]
+            if not found and not folders:
+                break
+            time.sleep(0.25)
+        return found, folders
+
+    def assert_no_browser_leftovers(self):
+        processes, folders = self.browser_leftovers()
+        self.assertEqual(processes, [], 'browser processes were left running')
+        self.assertEqual(folders, [], 'temporary profiles were left behind')
 
     def assert_artifacts(self, output, names):
         for name in names:
@@ -380,7 +406,7 @@ document.querySelector('#go').onclick = () => show(document.body.dataset.state =
     def test_mark_reports_missing_elements(self):
         output = self.folder / "missing"
         result = subprocess.run([NODE, str(SCRIPT), str(self.page), "--out", str(output), "--mark", "#go; .nope"],
-                                cwd=ROOT, env=self.env, capture_output=True, text=True, timeout=90)
+                                cwd=ROOT, env=self.env, capture_output=True, text=True, timeout=90, encoding='utf-8')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(".nope", result.stderr)
 
@@ -421,10 +447,10 @@ document.querySelector('#go').onclick = () => show(document.body.dataset.state =
           if (module.value !== 'module-works') console.error('LEGIT_RESOURCE_BLOCKED');
           console.error('AUDIT_FINISHED');
         })().catch(() => console.error('AUDIT_FAILED'));</script>'''.replace('PATHS', json.dumps(blocked))
-        self.page.write_text(self.page.read_text().replace('</body>', probe + '</body>'), encoding='utf-8')
+        self.page.write_text(self.page.read_text(encoding='utf-8').replace('</body>', probe + '</body>'), encoding='utf-8')
         output = self.folder / 'boundary-shots'
-        self.shoot(output, '--wait', '1000')
-        report = json.loads((output / 'report.json').read_text())
+        self.shoot(output, '--wait', '4000')
+        report = json.loads((output / 'report.json').read_text(encoding='utf-8'))
         issues = '\n'.join(report[0]['issues'])
         self.assertIn('AUDIT_FINISHED', issues)
         for marker in ('SECURITY_LEAK', 'LEGIT_RESOURCE_BLOCKED', 'AUDIT_FAILED'):
@@ -434,7 +460,7 @@ document.querySelector('#go').onclick = () => show(document.body.dataset.state =
         output = self.folder / 'safe-states'
         states = ['../escaped', '<label & "quoted">']
         self.shoot(output, '--states', ','.join(states), '--mask', '--sheet')
-        report = json.loads((output / 'report.json').read_text())
+        report = json.loads((output / 'report.json').read_text(encoding='utf-8'))
         self.assertEqual([entry['state'] for entry in report], states)
         for entry in report:
             self.assertRegex(entry['file'], r'^state-\d+-[0-9a-f]{12}\.png$')
@@ -443,10 +469,10 @@ document.querySelector('#go').onclick = () => show(document.body.dataset.state =
         self.assert_artifacts(output, ('sheet.png', 'sheet-masked.png'))
 
     def test_type_accepts_selectors_with_quotes(self):
-        self.page.write_text(self.page.read_text().replace('</body>', '<input data-x="value"></body>'), encoding='utf-8')
+        self.page.write_text(self.page.read_text(encoding='utf-8').replace('</body>', '<input data-x="value"></body>'), encoding='utf-8')
         output = self.folder / 'quoted-selector'
         self.shoot(output, '--steps', '''type 'input[data-x="value"]' hello''')
-        report = json.loads((output / 'report.json').read_text())
+        report = json.loads((output / 'report.json').read_text(encoding='utf-8'))
         self.assertEqual(report[0]['issues'], [])
 
     def test_record_steps(self):
@@ -472,6 +498,8 @@ document.querySelector('#go').onclick = () => show(document.body.dataset.state =
 
     @unittest.skipUnless(shutil.which('ffmpeg'), 'ffmpeg is needed to inspect frame pixels')
     def test_record_frames_follow_last_action_and_capture_short_feedback(self):
+        if os.environ.get('OIL_SHOOT_SLOW_HOST'):
+            self.skipTest('needs real-time frame capture: a 0.36s flash is missed on slow hosted runners')
         self.page.write_text('''<!doctype html><link rel="icon" href="data:,"><style>
 body{margin:0}#box{position:absolute;left:20px;top:20px;width:120px;height:120px;background:red}
 #box.prepared{background:lime}#box.feedback{animation:shake .36s linear}
@@ -492,7 +520,7 @@ document.querySelector('#drag').onmouseup=feedback;
 document.querySelector('#edit').oninput=feedback;
 document.querySelector('#choice').onchange=feedback;
 addEventListener('keydown',e=>{if(e.key==='Enter')feedback()});
-</script>''')
+</script>''', encoding='utf-8')
         actions = [('click #click', 'click'), ('dblclick #double', 'dblclick'),
                    ('drag #drag 20 0', 'drag'), ('type #edit X', 'type'),
                    ('fill #edit replacement', 'fill'), ('select #choice b', 'select'), ('key Enter', 'key')]
@@ -501,7 +529,7 @@ addEventListener('keydown',e=>{if(e.key==='Enter')feedback()});
                 output = self.folder / action
                 self.shoot(output, '--size', 'desktop', '--record', '--wait', '0', '--hold', '100',
                            '--steps', f'click #prepare; wait 700; {raw}; wait 500; hover #tail; scroll 0')
-                entry = json.loads((output / 'report.json').read_text())[0]
+                entry = json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]
                 self.assertEqual(entry['sampling'], {'mode': 'action', 'step': 3, 'action': action, 'raw': raw})
                 self.assertEqual(entry['issues'], [])
                 frames = entry['frames']
@@ -521,14 +549,32 @@ addEventListener('keydown',e=>{if(e.key==='Enter')feedback()});
                 self.assertLess(after[2], 40, after)
 
     @unittest.skipUnless(shutil.which('ffmpeg'), 'ffmpeg is needed to inspect frame pixels')
+    def test_entry_recording_starts_white_when_the_browser_is_in_dark_mode(self):
+        if sys.platform == 'win32':
+            self.skipTest('POSIX launch wrapper; on Windows the CI job with the dark system theme covers this')
+        import shlex
+        # A dark system theme makes the browser paint about:blank dark grey. The opening frame of an entry
+        # recording must not depend on the host theme.
+        wrapper = self.folder / 'dark-browser'
+        wrapper.write_text('#!/bin/sh\nexec ' + shlex.quote(self.browser) + ' --force-dark-mode "$@"\n', encoding='utf-8')
+        wrapper.chmod(0o755)
+        self.page.write_text('<!doctype html><link rel="icon" href="data:,"><style>body{margin:0;background:#ffd000}</style><p>entry</p>', encoding='utf-8')
+        output = self.folder / 'dark-entry'
+        result = subprocess.run([NODE, str(SCRIPT), str(self.page), '--out', str(output), '--record', '--entry', '--wait', '0', '--hold', '50'],
+                                cwd=ROOT, env=dict(self.env, CHROME_PATH=str(wrapper)), capture_output=True, text=True, encoding='utf-8', timeout=90)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        first = self.frame_pixel(output / 'record.mp4')
+        self.assertTrue(all(channel > 245 for channel in first), first)
+
+    @unittest.skipUnless(shutil.which('ffmpeg'), 'ffmpeg is needed to inspect frame pixels')
     def test_entry_frames_span_content_to_stable_and_short_recording_is_valid(self):
         self.page.write_text('''<!doctype html><link rel="icon" href="data:,"><style>
 body{margin:0;background:#ffd000}#box{width:200px;height:200px;background:blue;animation:appear .6s linear both}
 @keyframes appear{from{opacity:0}to{opacity:1}}
-</style><div id="box"></div>''')
+</style><div id="box"></div>''', encoding='utf-8')
         output = self.folder / 'entry-timing'
         self.shoot(output, '--record', '--entry', '--wait', '0', '--hold', '50')
-        entry = json.loads((output / 'report.json').read_text())[0]
+        entry = json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]
         self.assertEqual(entry['sampling'], {'mode': 'entry'})
         frames = entry['frames']
         self.assertLess(frames['start']['timeMs'], frames['mid']['timeMs'])
@@ -549,7 +595,7 @@ body{margin:0;background:#ffd000}#box{width:200px;height:200px;background:blue;a
     def test_record_without_changing_actions_keeps_head_middle_tail_sampling(self):
         output = self.folder / 'no-action-timing'
         self.shoot(output, '--record', '--steps', 'wait 200; hover #go', '--hold', '100')
-        entry = json.loads((output / 'report.json').read_text())[0]
+        entry = json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]
         self.assertEqual(entry['sampling'], {'mode': 'recording'})
         frames = entry['frames']
         self.assertEqual(frames['start']['timeMs'], 0)
@@ -578,7 +624,7 @@ body{margin:0;background:#ffd000}#box{width:200px;height:200px;background:blue;a
         result = subprocess.run([
             "ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json",
             str(output / "record.mp4"),
-        ], capture_output=True, text=True, timeout=10)
+        ], capture_output=True, text=True, timeout=10, encoding='utf-8')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertGreaterEqual(float(json.loads(result.stdout)["format"]["duration"]), 2.0)
 
@@ -704,7 +750,7 @@ h1{font-size:48px;margin:0 0 24px;background:linear-gradient(90deg,#7c3aed,#06b6
 <ul><li><span>🧭</span> 方向</li><li><span>🎉</span> 成果</li></ul>''', encoding='utf-8')
         output = self.folder / 'semantic-emoji'
         self.shoot(output)
-        hints = json.loads((output / 'report.json').read_text())[0]['lint']
+        hints = json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]['lint']
         emoji = next(h for h in hints if h['rule'] == 'emojiIcon')
         self.assertEqual(emoji['count'], 4)
         self.assertFalse(any(symbol in ' '.join(emoji['examples']) for symbol in ('😍', '🔥', '😂', '🧡', '☀️')))
@@ -725,7 +771,7 @@ body{margin:0}.outer{border-radius:12px;background:#eee;padding:12px;width:340px
 <script>popover.showPopover()</script>''', encoding='utf-8')
         output = self.folder / 'semantic-cards'
         self.shoot(output, '--size', 'desktop')
-        hints = json.loads((output / 'report.json').read_text())[0]['lint']
+        hints = json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]['lint']
         self.assertNotIn('nestedCards', {h['rule'] for h in hints})
 
     def test_lint_keeps_content_cards_inside_panels_and_editors(self):
@@ -736,30 +782,65 @@ body{margin:0}.outer{border-radius:12px;background:#eee;padding:12px;width:340px
 <form class="outer"><textarea></textarea><div class="box"><h3>另一个内容面板</h3><p>说明</p><button>操作</button></div></form>''', encoding='utf-8')
         output = self.folder / 'real-cards'
         self.shoot(output, '--size', 'desktop')
-        hints = json.loads((output / 'report.json').read_text())[0]['lint']
+        hints = json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]['lint']
         self.assertEqual(next(h for h in hints if h['rule'] == 'nestedCards')['count'], 2)
 
     def test_lint_requires_body_contrast_of_4_5(self):
         self.page.write_text('''<!doctype html><html><head><link rel="icon" href="data:,"><style>
 body{margin:0;padding:40px;font:16px/1.6 sans-serif;color:#222;background:#fff}
+body::before{content:"";position:absolute;left:0;top:0;width:12px;height:12px;background:#111}
 .soft{color:#8a8a8a}
-</style></head><body><p class="soft">Body text at about 3.5 to 1 contrast still fails the 4.5 to 1 floor.</p></body></html>''', encoding="utf-8")
+.faint{color:#eee}
+.faint-tiny{color:#eee;font-size:11px;line-height:1.2;width:280px}
+.seg{position:relative;display:inline-block;padding:8px 16px}
+.seg-pill{position:absolute;inset:0;background:#111;border-radius:8px}
+.seg-label{position:relative;color:#fff}
+.pseudo-seg{position:relative;display:inline-block;padding:8px 16px;color:#fff}
+.pseudo-seg::before{content:"";position:absolute;inset:0;background:#111;border-radius:8px;z-index:-1}
+</style></head><body>
+<p class="soft">Body text at about 3.5 to 1 contrast still fails the 4.5 to 1 floor.</p>
+<p class="faint">Body text at 1.16 to 1 on a plain white background must also be reported.</p>
+<p class="faint-tiny">这是一段在白底上几乎看不见而且字号过小、行高过紧的多行中文正文，用来验证极低对比度不会跳过排版检查。</p>
+<div class="seg"><span class="seg-pill"></span><span class="seg-label">Active Tab</span></div>
+<div class="pseudo-seg">Pseudo Pill Tab</div>
+</body></html>''', encoding="utf-8")
         output = self.folder / "soft"
         self.shoot(output, "--size", "1280x800")
-        lint = json.loads((output / "report.json").read_text(encoding="utf-8"))[0]["lint"]
-        self.assertIn("contrastLow", {item["rule"] for item in lint})
+        lint = {item["rule"]: item for item in json.loads((output / "report.json").read_text(encoding="utf-8"))[0]["lint"]}
+        self.assertIn("contrastLow", lint)
+        self.assertEqual(lint["contrastLow"]["count"], 3)
+        self.assertIn("smallText", lint)
+        self.assertIn("tightLeading", lint)
 
     def test_lint_spares_css_triangles_and_neutral_dividers(self):
         self.page.write_text('''<!doctype html><html><head><link rel="icon" href="data:,"><style>
 body{margin:0;padding:40px;font:16px/1.6 sans-serif;color:#222}
 .play{width:0;height:0;border-top:12px solid transparent;border-bottom:12px solid transparent;border-left:20px solid #e11d48}
 aside{border-right:1px solid #ddd;height:200px;width:200px}
+blockquote{border-left:4px solid #e11d48;padding:8px 16px;margin:16px 0}
+nav a{display:block;position:relative;padding:8px 16px;width:120px}
+nav a[aria-current="page"]{border-left:3px solid #2563eb}
+nav a.active::before{content:"";position:absolute;left:0;top:4px;width:3px;height:32px;background:#2563eb}
 @keyframes rise{from{opacity:0}to{opacity:1}}h1{animation:rise .6s ease-out both;font-size:40px;margin:48px 0 12px}
-</style></head><body><span class="play"></span><aside>Sidebar</aside><p>Intro paragraph above the heading.</p>
+</style></head><body><span class="play"></span><aside>Sidebar</aside><blockquote>Quoted passage with semantic blockquote border.</blockquote>
+<nav><a href="#a" aria-current="page">Overview</a><a href="#b" class="active">Settings</a><a href="#c">Billing</a></nav>
+<p>Intro paragraph above the heading.</p>
 <h1>Plain heading</h1><p>Body text that follows the heading closely.</p></body></html>''', encoding="utf-8")
         output = self.folder / "clean"
         self.shoot(output, "--size", "1280x800")
         self.assertEqual(json.loads((output / "report.json").read_text(encoding="utf-8"))[0]["lint"], [])
+
+        self.page.write_text('''<!doctype html><html><head><link rel="icon" href="data:,"><style>
+body{margin:0;padding:40px;font:16px/1.6 sans-serif;color:#222}
+nav a{display:block;position:relative;padding:8px 16px;width:120px}
+nav a.plain-border{border-left:4px solid #e11d48}
+nav a.plain-pseudo::before{content:"";position:absolute;left:0;top:4px;width:4px;height:32px;background:#e11d48}
+</style></head><body><nav><a href="#a" class="plain-border">Unselected A</a><a href="#b" class="plain-pseudo">Unselected B</a></nav></body></html>''', encoding="utf-8")
+        flagged = self.folder / "nav-unselected"
+        self.shoot(flagged, "--size", "1280x800")
+        lint = {item["rule"]: item for item in json.loads((flagged / "report.json").read_text(encoding="utf-8"))[0]["lint"]}
+        self.assertIn("sideStripe", lint)
+        self.assertEqual(lint["sideStripe"]["count"], 2)
 
     def test_compare_against_reference(self):
         reference = self.folder / "reference"
@@ -776,7 +857,7 @@ aside{border-right:1px solid #ddd;height:200px;width:200px}
         self.assertEqual(len(entry["compare"]["cells"]), 9)
         self.assertIn("差异明显的像素占", result.stdout)
         missing = subprocess.run([NODE, str(SCRIPT), str(self.page), "--compare", str(self.folder / "nope.png")],
-                                 cwd=ROOT, env=self.env, capture_output=True, text=True, timeout=30)
+                                 cwd=ROOT, env=self.env, capture_output=True, text=True, timeout=30, encoding='utf-8')
         self.assertNotEqual(missing.returncode, 0)
         self.assertIn("找不到参考图", missing.stderr)
 
@@ -795,7 +876,7 @@ const good = document.querySelector('#good'); good.getContext('webgl2') || good.
 
     def run_failure(self, output, *args):
         result = subprocess.run([NODE, str(SCRIPT), str(self.page), "--out", str(output), *args],
-                                cwd=ROOT, env=self.env, capture_output=True, text=True, timeout=110)
+                                cwd=ROOT, env=self.env, capture_output=True, text=True, timeout=110, encoding='utf-8')
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         return result
 
@@ -821,12 +902,12 @@ document.querySelector('#verify').onclick=()=>{
     if((el.isContentEditable?el.textContent:el.value)!==value ||
        JSON.stringify(changes[key])!==JSON.stringify([['input',value],['change',value]]))console.error('fill-failed-'+key);
   }
-};</script>''')
+};</script>''', encoding='utf-8')
         output = self.folder / 'fill'
         self.shoot(output, '--size', 'desktop', '--steps', 'type #insert X; fill #replace "new value"; '
                    'fill [aria-label="Message box"] "new text"; fill #empty ""; '
                    'fill #rich "new content"; click #verify')
-        self.assertEqual(json.loads((output / 'report.json').read_text())[0]['issues'], [])
+        self.assertEqual(json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]['issues'], [])
 
     def test_fill_rejects_non_editable_elements_with_context(self):
         result = self.run_failure(self.folder / 'fill-invalid', '--steps', 'fill #go hello')
@@ -847,10 +928,10 @@ document.querySelector('.veil').onmouseenter=()=>hovers++;
 document.querySelector('#target').onclick=()=>hits++;
 document.querySelector('#verify').onclick=()=>{
 if(clicks!==3 || doubles!==1 || hovers!==1 || hits!==0)console.error('blocked-actions-not-executed');
-};</script>''')
+};</script>''', encoding='utf-8')
         output = self.folder / 'blocked'
         result = self.shoot(output, '--steps', 'hover #target; click #target; dblclick #target; click #verify')
-        issues = json.loads((output / 'report.json').read_text())[0]['issues']
+        issues = json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]['issues']
         self.assertEqual(len(issues), 3, issues)
         for i, action in enumerate(['hover', 'click', 'dblclick'], 1):
             message = f'第 {i} 步「{action} #target」：中心点被 div.veil 挡住'
@@ -864,10 +945,10 @@ if(clicks!==3 || doubles!==1 || hovers!==1 || hits!==0)console.error('blocked-ac
 #target{width:120px;height:60px}#target span{display:block;width:100%;height:100%}</style>
 <button id="target"><span>Target</span></button><button id="disabled" disabled>Disabled</button>
 <script>let count=0;document.querySelector('#target').onclick=()=>count++;
-document.querySelector('#target').ondblclick=()=>{if(count!==3)console.error('descendant-click-failed')};</script>''')
+document.querySelector('#target').ondblclick=()=>{if(count!==3)console.error('descendant-click-failed')};</script>''', encoding='utf-8')
         output = self.folder / 'descendant'
         result = self.shoot(output, '--steps', 'hover #target; click #target; dblclick #target', '--mark', '#disabled')
-        self.assertEqual(json.loads((output / 'report.json').read_text())[0]['issues'], [])
+        self.assertEqual(json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]['issues'], [])
         self.assertNotIn('提示：第', result.stdout)
 
     def test_disabled_reasons_are_warnings_and_do_not_stop_actions(self):
@@ -876,11 +957,11 @@ document.querySelector('#target').ondblclick=()=>{if(count!==3)console.error('de
 <button id="pointer" style="pointer-events:none">Pointer</button>
 <fieldset disabled><button id="inherited">Inherited</button></fieldset><button id="verify">Verify</button>
 <script>let count=0;document.querySelector('#aria').onclick=()=>count++;
-document.querySelector('#verify').onclick=()=>{if(count!==1)console.error('aria-action-stopped')};</script>''')
+document.querySelector('#verify').onclick=()=>{if(count!==1)console.error('aria-action-stopped')};</script>''', encoding='utf-8')
         output = self.folder / 'disabled'
         result = self.shoot(output, '--size', 'desktop', '--steps', 'hover #disabled; click #aria; '
                             'dblclick #pointer; click #inherited; click #verify')
-        issues = json.loads((output / 'report.json').read_text())[0]['issues']
+        issues = json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]['issues']
         for step, reason in [('hover #disabled', 'disabled'), ('click #aria', 'aria-disabled="true"'),
                              ('dblclick #pointer', 'pointer-events: none'), ('click #inherited', 'disabled')]:
             self.assertTrue(any(f'「{step}」：目标处于禁用状态（{reason}）' in issue for issue in issues), issues)
@@ -891,10 +972,10 @@ document.querySelector('#verify').onclick=()=>{if(count!==1)console.error('aria-
     def test_action_warnings_are_in_recording_and_motion_reports(self):
         self.page.write_text('''<!doctype html><link rel="icon" href="data:,"><style>
 #target,#overlay{position:absolute;top:20px;left:20px;width:100px;height:50px}#overlay{z-index:2}</style>
-<button id="target" aria-disabled="true">Target</button><div id="overlay">Overlay</div>''')
+<button id="target" aria-disabled="true">Target</button><div id="overlay">Overlay</div>''', encoding='utf-8')
         output = self.folder / 'warning-record'
         result = self.shoot(output, '--motion', '--record', '--steps', 'click #target', '--hold', '0')
-        report = json.loads((output / 'report.json').read_text())
+        report = json.loads((output / 'report.json').read_text(encoding='utf-8'))
         self.assertEqual(len(report), 2)
         self.assertIn('motion', report[0])
         for entry in report:
@@ -905,7 +986,7 @@ document.querySelector('#verify').onclick=()=>{if(count!==1)console.error('aria-
         # A later failure must not erase warnings already raised by the recording.
         failed = self.folder / 'warning-before-failure'
         result = self.run_failure(failed, '--record', '--steps', 'click #target; click .missing', '--hold', '0')
-        entry = json.loads((failed / 'report.json').read_text())[0]
+        entry = json.loads((failed / 'report.json').read_text(encoding='utf-8'))[0]
         self.assertTrue(entry['failed'])
         self.assertTrue(any('中心点被 div#overlay 挡住' in issue for issue in entry['issues']), entry)
         self.assertTrue(any('aria-disabled="true"' in issue for issue in entry['issues']), entry)
@@ -921,14 +1002,14 @@ const root=document.querySelector('#host').attachShadow({mode:'open'});
 root.innerHTML='<button id="shadowed">Shadowed</button><div id="nested"></div>';
 root.querySelector('#nested').attachShadow({mode:'open'}).innerHTML='<button>Nested</button>';
 document.querySelector('#closed').attachShadow({mode:'closed'}).innerHTML='<button>Closed</button>';
-</script>''')
+</script>''', encoding='utf-8')
         for args in [('--steps', 'click #framed'), ('--steps', 'click text=Shadowed'),
                      ('--steps', 'fill #shadowed hello'), ('--mark', '#shadowed')]:
             with self.subTest(args=args):
                 result = self.run_failure(self.folder / 'scope', *args)
                 self.assertIn('找不到元素', result.stderr)
                 self.assertIn('选择器只在主文档里找，页面里有 2 个 iframe、2 个开放的 shadow root', result.stderr)
-        self.page.write_text('<!doctype html><link rel="icon" href="data:,"><body></body>')
+        self.page.write_text('<!doctype html><link rel="icon" href="data:,"><body></body>', encoding='utf-8')
         result = self.run_failure(self.folder / 'no-roots', '--steps', 'click .missing')
         self.assertNotIn('选择器只在主文档里找', result.stderr)
 
@@ -939,7 +1020,7 @@ document.querySelector('#closed').attachShadow({mode:'closed'}).innerHTML='<butt
              '0 个 iframe、1 个开放的 shadow root'),
         ]:
             with self.subTest(expected=expected):
-                self.page.write_text('<!doctype html><link rel="icon" href="data:,">' + markup)
+                self.page.write_text('<!doctype html><link rel="icon" href="data:,">' + markup, encoding='utf-8')
                 result = self.run_failure(self.folder / 'root-counts', '--steps', 'click .missing')
                 self.assertIn(expected, result.stderr)
 
@@ -967,14 +1048,14 @@ setInterval(()=>document.querySelector('#status').textContent=JSON.stringify({co
                             "--mark", '1=text=More; 2=button:has-text("Undo")')
         self.assert_artifacts(output, ("page.png", "page-marked.png"))
         # The report includes console output only on errors, so assert browser state through a guard.
-        self.page.write_text(self.page.read_text().replace('setInterval(()=>document', '''setTimeout(()=>{
+        self.page.write_text(self.page.read_text(encoding='utf-8').replace('setInterval(()=>document', '''setTimeout(()=>{
 if(count!==13 || document.querySelector('input').value!=='replacement' || document.querySelector('select').value!=='b' || document.body.dataset.hover!=='yes' || document.body.dataset.input!=='yes' || document.body.dataset.change!=='yes') console.error('action-guard-failed');
-},2600);setInterval(()=>document'''))
+},2600);setInterval(()=>document'''), encoding='utf-8')
         self.shoot(self.folder / "guard", "--steps", 'click text=More; click [aria-label="Send money"]; '
                    'click "[aria-label=\\"Send money\\"]"; hover button:has-text("Undo"); '
                    'dblclick button:has-text("Undo"); type [aria-label="Message box"] "hello world"; '
                    'key ControlOrMeta+A; type "body input" replacement; select #choice "Second item"; wait 2000')
-        report = json.loads((self.folder / "guard/report.json").read_text())
+        report = json.loads((self.folder / "guard/report.json").read_text(encoding='utf-8'))
         self.assertEqual(report[0]["issues"], [], result.stdout)
 
     def test_selector_errors_include_context_and_hints(self):
@@ -987,7 +1068,10 @@ if(count!==13 || document.querySelector('input').value!=='replacement' || docume
             ('waitfor .missing', ('第 1 步', 'waitfor .missing', '找不到元素')),
         ]:
             if expected == ('',):
-                self.shoot(self.folder / "contained", "--steps", raw)
+                # POSIX hands argv over as bytes in the locale's encoding and node reads them as UTF-8, so under a
+                # non-UTF-8 locale this selector is garbled before the tool sees it. Windows passes Unicode.
+                if sys.platform == 'win32' or sys.getfilesystemencoding().lower().replace('-', '') == 'utf8':
+                    self.shoot(self.folder / "contained", "--steps", raw)
                 continue
             with self.subTest(raw=raw):
                 result = self.run_failure(self.folder / "missing", "--steps", raw)
@@ -1002,20 +1086,20 @@ body{margin:0;height:2400px}#top{position:absolute;top:40px}#bottom{position:abs
 let last=0;topButton=document.querySelector('#top');topButton.onmouseenter=()=>{if(scrollY!==0)console.error('visible-scrolled')};
 topButton.onclick=()=>{if(scrollY!==0)console.error('visible-scrolled')};
 document.querySelector('#bottom').onclick=()=>{if(scrollY===0)console.error('offscreen-not-scrolled')};
-</script>''')
+</script>''', encoding='utf-8')
         self.shoot(self.folder / "scroll", "--size", "desktop", "--steps", "hover #top; click #top; click #bottom")
-        self.assertEqual(json.loads((self.folder / "scroll/report.json").read_text())[0]["issues"], [])
+        self.assertEqual(json.loads((self.folder / "scroll/report.json").read_text(encoding='utf-8'))[0]["issues"], [])
 
     def test_query_multiple_zooms_and_groups_reset(self):
-        self.page.write_text(self.page.read_text().replace('</body>', '''<script>
+        self.page.write_text(self.page.read_text(encoding='utf-8').replace('</body>', '''<script>
 if(new URLSearchParams(location.search).get('a')!=='1' || new URLSearchParams(location.search).get('b')!=='two words')console.error('query-missing');
 document.querySelector('#go').addEventListener('click',()=>{if(document.body.dataset.state!=='b')console.error('group-not-reset')});
-</script></body>'''))
+</script></body>'''), encoding='utf-8')
         output = self.folder / "multiple"
         self.shoot(output, "--size=desktop", "--zoom=1,2", "--query", "a=1&b=two+words", "--states", "a",
                    "--steps", "open: click body #go", "--steps", "send: click #go")
         self.assert_artifacts(output, ("a-open.png", "a-send.png", "a-open-@2x.png", "a-send-@2x.png"))
-        report = json.loads((output / "report.json").read_text())
+        report = json.loads((output / "report.json").read_text(encoding='utf-8'))
         self.assertTrue(all(r["issues"] == [] for r in report))
         self.assertEqual([r["zoom"] for r in report], [1, 1, 2, 2])
         aliases = self.folder / "aliases"
@@ -1028,7 +1112,7 @@ document.querySelector('#go').addEventListener('click',()=>{if(document.body.dat
         self.assert_artifacts(output, ("motion-open-start.jpg", "motion-open-mid.jpg", "motion-open-end.jpg", "motion-2-end.jpg"))
         if shutil.which('ffmpeg'):
             self.assert_artifacts(output, ("record-open.mp4", "record-2.mp4"))
-        self.assertEqual(len(json.loads((output / "report.json").read_text())), 2)
+        self.assertEqual(len(json.loads((output / "report.json").read_text(encoding='utf-8'))), 2)
 
     @unittest.skipUnless(shutil.which('ffmpeg'), 'ffmpeg is needed for complete evidence')
     def test_evidence_all_artifacts_and_partial_failure(self):
@@ -1037,13 +1121,13 @@ document.querySelector('#go').addEventListener('click',()=>{if(document.body.dat
         self.assert_artifacts(output, ("a.png", "b.png", "a-masked.png", "b-masked.png", "sheet.png", "sheet-masked.png",
                                       "a-@2x.png", "record-entry.mp4", "motion-entry-start.jpg", "motion-entry-mid.jpg", "motion-entry-end.jpg",
                                       "record-toggle.mp4", "motion-toggle-start.jpg", "motion-toggle-mid.jpg", "motion-toggle-end.jpg"))
-        report = json.loads((output / "report.json").read_text())
+        report = json.loads((output / "report.json").read_text(encoding='utf-8'))
         self.assertTrue(any(r["file"] == "motion-probe-toggle" for r in report))
         self.assertFalse((output / 'b-@2x.png').exists(), 'Default evidence still gives only the first state a 2x shot')
         failed = self.folder / "partial"
         result = self.run_failure(failed, "--evidence", "--hold=100", "--steps", "broken: click .missing", "--steps", "good: click #go")
         self.assert_artifacts(failed, ("page.png", "page-@2x.png", "record-entry.mp4", "record-good.mp4", "report.json"))
-        report = json.loads((failed / "report.json").read_text())
+        report = json.loads((failed / "report.json").read_text(encoding='utf-8'))
         self.assertEqual(sum(r.get("failed", False) for r in report), 2)
         self.assertIn("失败", result.stdout)
 
@@ -1057,13 +1141,13 @@ body{margin:0;background:#223344}#box{width:120px;height:120px;background:blue;a
 if(innerWidth!==800 || innerHeight!==600)console.error('zoom-changed-layout');
 if(new URLSearchParams(location.search).get('state')==='b')document.body.style.background='#441122';
 document.querySelector('#go').onclick=()=>document.body.style.background='#151515';
-</script>''')
+</script>''', encoding='utf-8')
         for option, zooms in [('--zoom=1', [1]), ('--zoom=1,2', [1, 2]), ('--zoom=2,3', [2, 3])]:
             with self.subTest(option=option):
                 output = self.folder / ('evidence-' + '-'.join(map(str, zooms)))
                 self.shoot(output, '--evidence', '--states', 'a,b', '--size', '800x600', option,
                            '--hold', '50', '--steps', 'change: click #go')
-                report = json.loads((output / 'report.json').read_text())
+                report = json.loads((output / 'report.json').read_text(encoding='utf-8'))
                 shots = [entry for entry in report if entry['file'].endswith('.png')]
                 self.assertEqual([(entry['zoom'], entry['state']) for entry in shots],
                                  [(zoom, state) for zoom in zooms for state in ['a', 'b']])
@@ -1099,18 +1183,95 @@ document.querySelector('#go').onclick=()=>document.body.style.background='#15151
         import shlex
         wrapper.write_text('#!/bin/sh\nif [ ! -f ' + shlex.quote(str(marker)) + ' ]; then\n'
                            'touch ' + shlex.quote(str(marker)) + '\nexec sleep 60\nfi\nexec '
-                           + shlex.quote(self.browser) + ' "$@"\n')
+                           + shlex.quote(self.browser) + ' "$@"\n', encoding='utf-8')
         wrapper.chmod(0o755)
         env = dict(self.env, CHROME_PATH=str(wrapper))
         output = self.folder / 'retried'
         result = subprocess.run([NODE, str(SCRIPT), str(self.page), '--out', str(output)],
-                                cwd=ROOT, env=env, capture_output=True, text=True, timeout=110)
+                                cwd=ROOT, env=env, capture_output=True, text=True, timeout=110, encoding='utf-8')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('45 秒内没有启动', result.stderr)
         self.assertIn('正在重试一次', result.stderr)
         self.assertIn('同时开了很多个任务时会变慢', result.stderr)
         self.assert_artifacts(output, ('page.png', 'report.json'))
         self.assertEqual(list(self.profile_root.glob('oil-shoot-*')), [])
+
+    def test_navigation_aborted_once_is_retried(self):
+        import http.server
+        import threading
+        requests = []
+
+        class AbortFirst(http.server.BaseHTTPRequestHandler):
+            def do_GET(handler):
+                if handler.path != '/page':
+                    handler.send_response(404)
+                    handler.end_headers()
+                    return
+                requests.append(handler.path)
+                if len(requests) == 1:
+                    # A response without content cancels the navigation: the browser reports net::ERR_ABORTED.
+                    handler.send_response(204)
+                    handler.end_headers()
+                    return
+                body = b'<!doctype html><link rel="icon" href="data:,"><h1>loaded</h1>'
+                handler.send_response(200)
+                handler.send_header('Content-Type', 'text/html; charset=utf-8')
+                handler.send_header('Content-Length', str(len(body)))
+                handler.end_headers()
+                handler.wfile.write(body)
+
+            def log_message(*args):
+                pass
+
+        server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), AbortFirst)
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        output = self.folder / 'aborted-once'
+        result = subprocess.run([NODE, str(SCRIPT), f'http://127.0.0.1:{server.server_port}/page', '--out', str(output)],
+                                cwd=ROOT, env=self.env, capture_output=True, text=True, encoding='utf-8', timeout=90)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(len(requests), 2, requests)
+        self.assert_artifacts(output, ('page.png', 'report.json'))
+
+    def test_run_leaves_no_browser_process_or_profile(self):
+        output = self.folder / 'clean'
+        self.shoot(output)
+        self.assert_artifacts(output, ('page.png', 'report.json'))
+        self.assert_no_browser_leftovers()
+
+    def test_launcher_that_hands_off_and_exits_is_ready_and_cleaned(self):
+        if sys.platform == 'win32':
+            self.skipTest('POSIX launch wrapper')
+        import shlex
+        # The spawned process starts the real browser in the background and exits at once. Its stderr never
+        # reaches the tool, so readiness has to come from the DevToolsActivePort file in the profile.
+        wrapper = self.folder / 'hand-off'
+        wrapper.write_text('#!/bin/sh\nnohup ' + shlex.quote(self.browser) + ' "$@" >/dev/null 2>&1 &\nexit 0\n', encoding='utf-8')
+        wrapper.chmod(0o755)
+        output = self.folder / 'handed-off'
+        result = subprocess.run([NODE, str(SCRIPT), str(self.page), '--out', str(output)], cwd=ROOT,
+                                env=dict(self.env, CHROME_PATH=str(wrapper)), capture_output=True, text=True, timeout=90, encoding='utf-8')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assert_artifacts(output, ('page.png', 'report.json'))
+        self.assert_no_browser_leftovers()
+
+    def test_browser_that_never_becomes_ready_is_killed_by_profile(self):
+        if sys.platform == 'win32':
+            self.skipTest('POSIX launch wrapper')
+        # The launcher exits while a real browser keeps running on a profile inside the tool's temporary folder,
+        # so no readiness signal ever appears. Killing the spawned process would not reach that browser.
+        wrapper = self.folder / 'never-ready'
+        wrapper.write_text('#!' + sys.executable + '\nimport subprocess, sys\n'
+                           'args = [a + "/elsewhere" if a.startswith("--user-data-dir=") else a for a in sys.argv[1:]]\n'
+                           'subprocess.Popen([' + repr(self.browser) + ', *args], stdout=subprocess.DEVNULL, '
+                           'stderr=subprocess.DEVNULL, start_new_session=True)\n', encoding='utf-8')
+        wrapper.chmod(0o755)
+        result = subprocess.run([NODE, str(SCRIPT), str(self.page), '--out', str(self.folder / 'never')], cwd=ROOT,
+                                env=dict(self.env, CHROME_PATH=str(wrapper)), capture_output=True, text=True, timeout=90, encoding='utf-8')
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('浏览器启动失败', result.stderr)
+        self.assert_no_browser_leftovers()
 
 
     def test_text_matching_priority_and_combo_modifiers(self):
@@ -1124,16 +1285,16 @@ const keys=[];addEventListener('keydown',e=>keys.push([e.key,e.metaKey,e.ctrlKey
 document.getElementById('verify').onclick=()=>{
 if(hits.join(',')!=='clickable,deep,partial')console.error('text-priority-failed');
 if(!keys.some(k=>k[0]==='A'&&k[1]) || !keys.some(k=>k[0]==='A'&&k[2]) || !keys.some(k=>k[0]==='Tab'&&k[3]))console.error('combo-modifiers-failed');
-};</script>''')
+};</script>''', encoding='utf-8')
         output = self.folder / 'priorities'
         self.shoot(output, '--steps', 'click text=More; click text=Deep; click text="Send money"; '
                    'click #edit; key Meta+A; key Control+A; key Shift+Tab; click #verify')
-        self.assertEqual(json.loads((output / 'report.json').read_text())[0]['issues'], [])
+        self.assertEqual(json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]['issues'], [])
 
     def test_mark_and_waitfor_accept_later_visible_css_match(self):
         self.page.write_text('''<!doctype html><link rel="icon" href="data:,"><button class="target" hidden>Hidden</button>
 <button class="target">Shown</button><div class="delayed" style="opacity:0">Ready</div>
-<script>setTimeout(()=>document.querySelector('.delayed').style.opacity=1,800)</script>''')
+<script>setTimeout(()=>document.querySelector('.delayed').style.opacity=1,800)</script>''', encoding='utf-8')
         output = self.folder / 'visible-match'
         self.shoot(output, '--steps', 'waitfor .target; waitfor .delayed', '--mark', '.target')
         self.assert_artifacts(output, ('page.png', 'page-marked.png'))
@@ -1162,7 +1323,7 @@ if(!keys.some(k=>k[0]==='A'&&k[1]) || !keys.some(k=>k[0]==='A'&&k[2]) || !keys.s
             with self.subTest(reason=reason):
                 self.page.write_text(f'''<!doctype html><link rel="icon" href="data:,">
 <button data-view="activity">Activity</button><div id="container" style="{parent_style}">
-<button data-view="accounts" {attrs}>Accounts</button><button data-view="accounts" {attrs}>Accounts 2</button></div>''')
+<button data-view="accounts" {attrs}>Accounts</button><button data-view="accounts" {attrs}>Accounts 2</button></div>''', encoding='utf-8')
                 result = self.run_failure(self.folder / 'hidden', '--size', 'desktop', '--steps', 'click [data-view="accounts"]')
                 self.assertIn('匹配到 2 个元素', result.stderr)
                 self.assertIn(reason, result.stderr)
@@ -1170,7 +1331,7 @@ if(!keys.some(k=>k[0]==='A'&&k[1]) || !keys.some(k=>k[0]==='A'&&k[2]) || !keys.s
                 self.assertIn('先执行让它出现的那一步', result.stderr)
                 self.assertIn('例如 click [data-view="activity"]', result.stderr)
         self.page.write_text('''<!doctype html><link rel="icon" href="data:,"><details id="tools">
-<summary>Tools</summary><button data-view="accounts">Accounts</button></details>''')
+<summary>Tools</summary><button data-view="accounts">Accounts</button></details>''', encoding='utf-8')
         result = self.run_failure(self.folder / 'closed', '--steps', 'click [data-view="accounts"]')
         self.assertIn('details 未展开', result.stderr)
         self.assertIn('例如 click #tools > summary', result.stderr)
@@ -1191,20 +1352,20 @@ document.querySelectorAll('.double')[1].ondblclick=()=>doubled=true;
 document.querySelectorAll('.drag')[1].onmousedown=()=>dragged=true;
 document.querySelector('#verify').onclick=()=>{
 if(clicked!==1 || !hovered || !doubled || !dragged || document.querySelectorAll('.edit')[1].value!=='hello' || document.querySelectorAll('.choice')[1].value!=='b')console.error('visible-match-failed');
-};</script>''')
+};</script>''', encoding='utf-8')
         output = self.folder / 'visible-actions'
         self.shoot(output, '--size', 'desktop', '--steps', 'hover .target; click .target; dblclick .double; '
                    'drag .drag 20 0; type .edit hello; select .choice b; waitfor .target; click #verify')
-        self.assertEqual(json.loads((output / 'report.json').read_text())[0]['issues'], [])
+        self.assertEqual(json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]['issues'], [])
         # waitfor must continue polling matches that exist but are still hidden.
         self.page.write_text('''<!doctype html><link rel="icon" href="data:,"><button id="later" hidden>Ready</button>
-<script>setTimeout(()=>document.querySelector('#later').hidden=false,700)</script>''')
+<script>setTimeout(()=>document.querySelector('#later').hidden=false,700)</script>''', encoding='utf-8')
         self.shoot(self.folder / 'later', '--wait', '0', '--steps', 'waitfor #later; click #later')
 
     def test_selector_examples_and_text_hints_are_relevant(self):
         self.page.write_text('''<!doctype html><link rel="icon" href="data:,"><p>Alpha unrelated</p><p>Send monez</p>
 <button>Send money now</button><button data-view="accounts" hidden>Hidden</button>
-<button data-view="activity">Activity</button>''')
+<button data-view="activity">Activity</button>''', encoding='utf-8')
         for action in ['click', 'hover', 'dblclick']:
             result = self.run_failure(self.folder / action, '--steps', action + ' [data-view="missing"]')
             self.assertIn('例如 ' + action + ' [data-view="activity"]', result.stderr)
@@ -1215,7 +1376,7 @@ if(clicked!==1 || !hovered || !doubled || !dragged || document.querySelectorAll(
         self.assertLess(result.stderr.index('可见文字 "Send money now"'), result.stderr.index('可见文字 "Send monez"'))
         result = self.run_failure(self.folder / 'similar', '--steps', 'click text="Send monet"')
         self.assertLess(result.stderr.index('可见文字 "Send monez"'), result.stderr.index('可见文字 "Alpha unrelated"'))
-        self.page.write_text('<!doctype html><link rel="icon" href="data:,"><body></body>')
+        self.page.write_text('<!doctype html><link rel="icon" href="data:,"><body></body>', encoding='utf-8')
         result = self.run_failure(self.folder / 'generic', '--steps', 'hover .missing')
         self.assertIn('例如 hover .open', result.stderr)
 
@@ -1255,21 +1416,21 @@ globalThis.WebSocket=class extends Native {
    write({capture:++captures,timeout:watchdog.delay});
    if(drops.has(captures)){clearTimeout(watchdog.timer);originalTimer(watchdog.callback,100);return;}
  }return super.send(data)}
-};''')
-        return dict(self.env, NODE_OPTIONS='--import=' + str(preload), SHOOT_TEST_DROPS=drops,
+};''', encoding='utf-8')
+        return dict(self.env, NODE_OPTIONS='--import=' + preload.as_uri(), SHOOT_TEST_DROPS=drops,
                     SHOOT_TEST_JOURNAL=str(journal), **({'SHOOT_TEST_STALE': str(stale)} if stale else {})), journal
 
     def test_screenshot_timeout_reopens_and_retries_once(self):
         env, journal = self.fault_env('1')
         output = self.folder / 'screenshot-retry'
         result = subprocess.run([NODE, str(SCRIPT), str(self.page), '--out', str(output), '--timeout-scale', '2'],
-                                cwd=ROOT, env=env, capture_output=True, text=True, timeout=90)
+                                cwd=ROOT, env=env, capture_output=True, text=True, timeout=90, encoding='utf-8')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        events = [json.loads(line) for line in journal.read_text().splitlines()]
+        events = [json.loads(line) for line in journal.read_text(encoding='utf-8').splitlines()]
         self.assertEqual(sum('connection' in row for row in events), 2)
         self.assertEqual([row['timeout'] for row in events if 'capture' in row], [180000, 180000])
         self.assertIn('正在重开浏览器重试 page.png 一次', result.stderr)
-        self.assertEqual(len(json.loads((output / 'report.json').read_text())), 1)
+        self.assertEqual(len(json.loads((output / 'report.json').read_text(encoding='utf-8'))), 1)
         self.assert_artifacts(output, ('page.png', 'report.json'))
         self.assertEqual(list(self.profile_root.glob('oil-shoot-*')), [])
 
@@ -1277,17 +1438,17 @@ globalThis.WebSocket=class extends Native {
         env, journal = self.fault_env('2')
         output = self.folder / 'masked-retry'
         result = subprocess.run([NODE, str(SCRIPT), str(self.page), '--out', str(output), '--states', 'a,b', '--mask'],
-                                cwd=ROOT, env=env, capture_output=True, text=True, timeout=90)
+                                cwd=ROOT, env=env, capture_output=True, text=True, timeout=90, encoding='utf-8')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('[4/4]', result.stderr)
         self.assertIn('--mask', result.stderr)
-        report = json.loads((output / 'report.json').read_text())
+        report = json.loads((output / 'report.json').read_text(encoding='utf-8'))
         self.assertEqual([entry['file'] for entry in report], ['a.png', 'b.png'])
         self.assertEqual([entry['issues'] for entry in report], [[], []])
         self.assert_artifacts(output, ('a.png', 'a-masked.png', 'b.png', 'b-masked.png'))
         self.assertNotEqual((output / 'a.png').read_bytes(), (output / 'a-masked.png').read_bytes())
         self.assertNotEqual((output / 'a-masked.png').read_bytes(), (output / 'b-masked.png').read_bytes())
-        events = [json.loads(line) for line in journal.read_text().splitlines()]
+        events = [json.loads(line) for line in journal.read_text(encoding='utf-8').splitlines()]
         self.assertEqual(sum('connection' in row for row in events), 2)
         self.assertEqual(list(self.profile_root.glob('oil-shoot-*')), [])
 
@@ -1297,9 +1458,9 @@ globalThis.WebSocket=class extends Native {
         output = self.folder / 'screenshot-failed-evidence'
         result = subprocess.run([NODE, str(SCRIPT), str(self.page), '--out', str(output), '--evidence',
                                  '--hold', '100', '--steps', 'toggle: click #go'],
-                                cwd=ROOT, env=env, capture_output=True, text=True, timeout=90)
+                                cwd=ROOT, env=env, capture_output=True, text=True, timeout=90, encoding='utf-8')
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        report = json.loads((output / 'report.json').read_text())
+        report = json.loads((output / 'report.json').read_text(encoding='utf-8'))
         self.assertTrue(report[0]['failed'])
         self.assertIn('Page.captureScreenshot 90 秒', report[0]['issues'][-1])
         self.assertFalse(any(row['file'] == 'browser' for row in report))
@@ -1317,14 +1478,14 @@ globalThis.WebSocket=class extends Native {
         wrapper = self.folder / 'cannot-reopen'
         marker = self.folder / 'launched'
         wrapper.write_text('#!/bin/sh\nif [ -f ' + shlex.quote(str(marker)) + ' ]; then exit 1; fi\n'
-                           'touch ' + shlex.quote(str(marker)) + '\nexec ' + shlex.quote(self.browser) + ' "$@"\n')
+                           'touch ' + shlex.quote(str(marker)) + '\nexec ' + shlex.quote(self.browser) + ' "$@"\n', encoding='utf-8')
         wrapper.chmod(0o755)
         output = self.folder / 'restart-failed'
         result = subprocess.run([NODE, str(SCRIPT), str(self.page), '--out', str(output), '--evidence'],
-                                cwd=ROOT, env=dict(env, CHROME_PATH=str(wrapper)), capture_output=True, text=True, timeout=90)
+                                cwd=ROOT, env=dict(env, CHROME_PATH=str(wrapper)), capture_output=True, text=True, timeout=90, encoding='utf-8')
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('浏览器重开失败', result.stderr)
-        report = json.loads((output / 'report.json').read_text())
+        report = json.loads((output / 'report.json').read_text(encoding='utf-8'))
         self.assertEqual(report[-1]['file'], 'browser')
         self.assertEqual(list(output.glob('record*.mp4')), [])
         self.assertEqual(list(self.profile_root.glob('oil-shoot-*')), [])
@@ -1332,7 +1493,7 @@ globalThis.WebSocket=class extends Native {
     @unittest.skipUnless(shutil.which('ffmpeg'), 'ffmpeg is needed to inspect recording')
     def test_stale_screencast_warns_preserves_stream_and_appends_screenshot(self):
         self.page.write_text('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><style>body{margin:0;background:#182838}'
-                             '#box{position:absolute;left:60px;top:40px;width:240px;height:160px;border:4px solid #ffff00}</style><div id="box"></div>')
+                             '#box{position:absolute;left:60px;top:40px;width:240px;height:160px;border:4px solid #ffff00}</style><div id="box"></div>', encoding='utf-8')
         stale = self.folder / 'stale.jpg'
         subprocess.run(['ffmpeg', '-y', '-v', 'error', '-f', 'lavfi', '-i',
                         'color=c=0x182838:s=390x844,drawbox=x=60:y=40:w=248:h=168:color=yellow:t=4,'
@@ -1341,9 +1502,9 @@ globalThis.WebSocket=class extends Native {
         env, _ = self.fault_env(stale=stale)
         output = self.folder / 'stale-stream'
         result = subprocess.run([NODE, str(SCRIPT), str(self.page), '--out', str(output), '--record', '--hold', '100'],
-                                cwd=ROOT, env=env, capture_output=True, text=True, timeout=90)
+                                cwd=ROOT, env=env, capture_output=True, text=True, timeout=90, encoding='utf-8')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        entry = json.loads((output / 'report.json').read_text())[0]
+        entry = json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]
         self.assertEqual(entry['consistency']['status'], 'mismatch')
         self.assertIn('可能没拍全', entry['warnings'][0])
         self.assertIn('静止终态以 motion-end.jpg 为准', result.stdout)
@@ -1360,7 +1521,7 @@ globalThis.WebSocket=class extends Native {
     def test_cdp_request_times_out_in_current_step(self):
         import time
         self.page.write_text('''<!doctype html><link rel="icon" href="data:,"><button id="prepare">Prepare</button><button id="hang">Hang</button>
-<script>document.querySelector('#prepare').onclick=()=>{document.querySelector('#hang').getBoundingClientRect=()=>{while(true){}}};</script>''')
+<script>document.querySelector('#prepare').onclick=()=>{document.querySelector('#hang').getBoundingClientRect=()=>{while(true){}}};</script>''', encoding='utf-8')
         output = self.folder / 'cdp-timeout'
         start = time.monotonic()
         result = self.run_failure(output, '--size', 'desktop', '--steps', 'click #prepare; click #hang')
@@ -1370,7 +1531,7 @@ globalThis.WebSocket=class extends Native {
         self.assertGreaterEqual(elapsed, 30)
         self.assertLess(elapsed, 42)
         self.assertEqual(list(self.profile_root.glob('oil-shoot-*')), [])
-        self.assertTrue(any(r.get('failed') for r in json.loads((output / 'report.json').read_text())))
+        self.assertTrue(any(r.get('failed') for r in json.loads((output / 'report.json').read_text(encoding='utf-8'))))
 
     def test_browser_disconnect_interrupts_steps_and_cleans_frames(self):
         if sys.platform == 'win32':
@@ -1382,7 +1543,7 @@ globalThis.WebSocket=class extends Native {
         import time
         pid_file = self.folder / 'chrome.pid'
         wrapper = self.folder / 'chrome-kill-wrapper'
-        wrapper.write_text('#!/bin/sh\necho $$ > ' + shlex.quote(str(pid_file)) + '\nexec ' + shlex.quote(self.browser) + ' "$@"\n')
+        wrapper.write_text('#!/bin/sh\necho $$ > ' + shlex.quote(str(pid_file)) + '\nexec ' + shlex.quote(self.browser) + ' "$@"\n', encoding='utf-8')
         wrapper.chmod(0o755)
 
         class KillHandler(http.server.BaseHTTPRequestHandler):
@@ -1390,7 +1551,7 @@ globalThis.WebSocket=class extends Native {
                 handler.send_response(200)
                 handler.end_headers()
                 handler.wfile.write(b'ok')
-                os.kill(int(pid_file.read_text().strip()), signal.SIGKILL)
+                os.kill(int(pid_file.read_text(encoding='utf-8').strip()), signal.SIGKILL)
 
             def log_message(*args):
                 pass
@@ -1400,12 +1561,12 @@ globalThis.WebSocket=class extends Native {
         self.addCleanup(server.shutdown)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.page.write_text(f'''<!doctype html><link rel="icon" href="data:,"><button id="kill">Kill</button>
-<script>document.querySelector('#kill').onclick=()=>setTimeout(()=>fetch('http://127.0.0.1:{server.server_port}/kill'),250);</script>''')
+<script>document.querySelector('#kill').onclick=()=>setTimeout(()=>fetch('http://127.0.0.1:{server.server_port}/kill'),250);</script>''', encoding='utf-8')
         output = self.folder / 'disconnect'
         start = time.monotonic()
         result = subprocess.run([NODE, str(SCRIPT), str(self.page), '--out', str(output), '--record', '--hold', '100',
                                  '--steps', 'disconnect: click #kill; wait 60000'], cwd=ROOT,
-                                env=dict(self.env, CHROME_PATH=str(wrapper)), capture_output=True, text=True, timeout=15)
+                                env=dict(self.env, CHROME_PATH=str(wrapper)), capture_output=True, text=True, timeout=15, encoding='utf-8')
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('第 2 步「wait 60000」', result.stderr)
         self.assertIn('浏览器连接意外断开', result.stderr)
@@ -1416,13 +1577,13 @@ globalThis.WebSocket=class extends Native {
     def test_deduplicated_states_sizes_zooms_and_filename_collisions(self):
         output = self.folder / 'deduplicated'
         result = self.shoot(output, '--states', 'a,a,b,a', '--size', 'desktop,1440x900,phone,mobile', '--zoom', '1,1.0')
-        report = json.loads((output / 'report.json').read_text())
+        report = json.loads((output / 'report.json').read_text(encoding='utf-8'))
         self.assertEqual(len(report), 4)
         for message in ['状态 已去重', '尺寸 已去重', '倍数 已去重']:
             self.assertIn(message, result.stdout)
         output = self.folder / 'group-collision'
         result = self.shoot(output, '--states', 'a,a-b', '--steps', 'b-c: wait 0', '--steps', 'c: wait 0')
-        report = json.loads((output / 'report.json').read_text())
+        report = json.loads((output / 'report.json').read_text(encoding='utf-8'))
         self.assertEqual(len(set(r['file'] for r in report)), 4)
         self.assert_artifacts(output, ('a-b-c.png', 'a-b-c-2.png'))
         self.assertIn('文件名冲突，已区分', result.stdout)
@@ -1444,10 +1605,10 @@ if(s.opacity!=='1'||parseFloat(s.marginLeft)<99)console.error('captured-during-m
 };
 // Screenshot checks read document.images; inspect its computed styles at that moment.
 Object.defineProperty(document,'images',{get(){capture();return []}});
-</script>''')
+</script>''', encoding='utf-8')
         output = self.folder / 'settled'
         self.shoot(output, '--wait', '0', '--steps', 'click #go')
-        report = json.loads((output / 'report.json').read_text())[0]
+        report = json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]
         self.assertEqual(report['issues'], [])
         self.assertGreater(report['animationWaitMs'], 600)
         self.assertLessEqual(report['animationWaitMs'], 2000)
@@ -1457,10 +1618,10 @@ Object.defineProperty(document,'images',{get(){capture();return []}});
             with self.subTest(duration=duration):
                 self.page.write_text(f'''<!doctype html><link rel="icon" href="data:,"><style>
 @keyframes slow{{from{{transform:translateX(0)}}to{{transform:translateX(100px)}}}}
-div{{animation:slow {duration}}}</style><div>Ready</div>''')
+div{{animation:slow {duration}}}</style><div>Ready</div>''', encoding='utf-8')
                 output = self.folder / ('finite-cap' if expected_wait else 'infinite')
                 self.shoot(output, '--wait', '0')
-                waited = json.loads((output / 'report.json').read_text())[0]['animationWaitMs']
+                waited = json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]['animationWaitMs']
                 if expected_wait:
                     self.assertGreaterEqual(waited, 1950)
                     self.assertLessEqual(waited, 2000)
@@ -1469,10 +1630,10 @@ div{{animation:slow {duration}}}</style><div>Ready</div>''')
         # Recording and motion probing continue to observe the animation from the original timing.
         output = self.folder / 'record-unsettled'
         self.shoot(output, '--wait', '0', '--record', '--entry', '--hold', '100')
-        report = json.loads((output / 'report.json').read_text())[0]
+        report = json.loads((output / 'report.json').read_text(encoding='utf-8'))[0]
         self.assertNotIn('animationWaitMs', report)
         self.shoot(self.folder / 'motion-unsettled', '--wait', '0', '--motion')
-        report = json.loads((self.folder / 'motion-unsettled/report.json').read_text())[0]
+        report = json.loads((self.folder / 'motion-unsettled/report.json').read_text(encoding='utf-8'))[0]
         self.assertNotIn('animationWaitMs', report)
 
 
@@ -1485,21 +1646,21 @@ div{{animation:slow {duration}}}</style><div>Ready</div>''')
         import time
         browser_pid = self.folder / 'browser.pid'
         wrapper = self.folder / 'chrome-encoder-wrapper'
-        wrapper.write_text('#!/bin/sh\necho $$ > ' + shlex.quote(str(browser_pid)) + '\nexec ' + shlex.quote(self.browser) + ' "$@"\n')
+        wrapper.write_text('#!/bin/sh\necho $$ > ' + shlex.quote(str(browser_pid)) + '\nexec ' + shlex.quote(self.browser) + ' "$@"\n', encoding='utf-8')
         wrapper.chmod(0o755)
         encoder_ready = self.folder / 'encoder-ready'
         fake_bin = self.folder / 'bin'
         fake_bin.mkdir()
         encoder = fake_bin / 'ffmpeg'
         encoder.write_text('#!/bin/sh\nif [ "$1" = "-version" ]; then exit 0; fi\n'
-                           'touch ' + shlex.quote(str(encoder_ready)) + '\nexec sleep 60\n')
+                           'touch ' + shlex.quote(str(encoder_ready)) + '\nexec sleep 60\n', encoding='utf-8')
         encoder.chmod(0o755)
         stop = threading.Event()
 
         def disconnect():
             while not stop.wait(.02):
                 if encoder_ready.exists():
-                    os.kill(int(browser_pid.read_text()), signal.SIGKILL)
+                    os.kill(int(browser_pid.read_text(encoding='utf-8')), signal.SIGKILL)
                     return
 
         thread = threading.Thread(target=disconnect, daemon=True)
@@ -1509,7 +1670,7 @@ div{{animation:slow {duration}}}</style><div>Ready</div>''')
             start = time.monotonic()
             result = subprocess.run([NODE, str(SCRIPT), str(self.page), '--out', str(output), '--record', '--hold', '100'],
                                     cwd=ROOT, env=dict(self.env, CHROME_PATH=str(wrapper), PATH=str(fake_bin) + os.pathsep + os.environ['PATH']),
-                                    capture_output=True, text=True, timeout=15)
+                                    capture_output=True, text=True, timeout=15, encoding='utf-8')
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertTrue(encoder_ready.exists())
             self.assertIn('浏览器连接意外断开', result.stderr)

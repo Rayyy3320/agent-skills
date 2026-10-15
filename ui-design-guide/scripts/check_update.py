@@ -138,7 +138,7 @@ def update_context(approved: bool = False) -> tuple[str, str | None, bool]:
     node_version = ""
     if node and approved:
         try:
-            result = subprocess.run([node, "--version"], env=update_environment(), capture_output=True, text=True, timeout=3)
+            result = subprocess.run([node, "--version"], env=update_environment(), capture_output=True, text=True, timeout=3, encoding="utf-8")
             if result.returncode == 0:
                 node_version = result.stdout.strip()
         except (OSError, subprocess.SubprocessError):
@@ -181,7 +181,7 @@ def auto_update(name: str, latest: str, free: bool, npx: str | None, ready: bool
     try:
         result = subprocess.run([npx, "-y", CLI, "update", name, "--path", str(ROOT), "--json"], env=env,
                                 stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                                timeout=UPDATE_TIMEOUT, check=False)
+                                timeout=UPDATE_TIMEOUT, check=False, encoding="utf-8", errors="replace")
     except FileNotFoundError:
         return UpdateResult(False, "dependencies")
     except subprocess.TimeoutExpired:
@@ -248,7 +248,15 @@ def notice(name: str, current: str, latest: str, detail: str, reason: str) -> st
     return intro + f"在终端运行 {command} 即可更新。"
 
 
+def utf8_output() -> None:
+    """管道另一头的 Agent 按 UTF-8 读；控制台的代码页可能连中文都没有。"""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure") and not stream.isatty():
+            stream.reconfigure(encoding="utf-8")
+
+
 def main() -> int:
+    utf8_output()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--update", action="store_true", help="Explicitly authorize updating this installation")
     approved = parser.parse_args().update

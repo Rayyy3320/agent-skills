@@ -542,7 +542,15 @@ manifest.json 最少要有：
 成功时在标准输出打印一行 JSON：output、candidates、fingerprint、bytes。"""
 
 
+def utf8_output() -> None:
+    """管道另一头的 Agent 按 UTF-8 读；控制台的代码页可能连中文都没有。"""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure") and not stream.isatty():
+            stream.reconfigure(encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
+    utf8_output()
     if sys.version_info < (3, 10):
         print("需要 Python 3.10 或更新版本", file=sys.stderr)
         return 2

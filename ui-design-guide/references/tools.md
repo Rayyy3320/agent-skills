@@ -2,6 +2,8 @@
 
 本目录自带的程序不需要读源码。这里只写什么时候用和最常用的几条命令；全部选项、动作写法和输出文件见各自的 `--help`，写错时报错会给出照抄就能用的写法。
 
+Python 生成工具需要 Python 3.10+；系统的 `python3` 过旧时，选择宿主已有的合格运行时，不修改系统默认解释器。
+
 宿主有自己的浏览器工具时，查看页面、走查流程照常用。要交证据时优先用这里的截图工具：它开一个独立的临时浏览器，不碰用户自己浏览器里的数据。本机缺 Node 22，或者没有 Chrome、Chromium、Edge 时，退回宿主工具，交出同样的证据。任务或项目已经指定了截图工具时，照用它。
 
 ## 截图和录屏
@@ -42,6 +44,25 @@ node <skill>/scripts/shoot.mjs <页面地址或 HTML 文件> [选项]
 - **结合任务判断**：有色底上的灰字、正文行太长，以及眉标、单侧边线、渐变文字、嵌套卡片等风格提示。只修复影响当前可读性、设计依据或用户目标的问题，不为清零提示而删掉合理设计，也不要求逐条解释保留的审美选择。
 
 检查会误报，例如真实的步骤编号、确实需要的标签；误报不构成修改或追加验收的依据；只有影响用户判断时才说明。它只认得写法，判断不了好不好看：提示清零之后，仍要自己看截图。检查报出接口 401、404 这类和画面无关的错误时，在交付说明里记一行，不为了让检查通过去改登录、接口这类业务代码。
+
+## 检索和下载真实素材
+
+需要真实材质、设计馆藏、历史摄影、工程蓝图、地图、科学版画或科技影像时使用 `curate-media.mjs`，不为普通局部修改自动检索。需要 Node.js 22+，无 npm 依赖；在项目工作目录运行，建议用英文关键词。`<skill>` 是本 Skill 安装路径：
+
+```text
+node <skill>/scripts/curate-media.mjs search "<关键词>" --kind texture --limit 6 --sheet --dir candidates
+node <skill>/scripts/curate-media.mjs preview V1,T2 --sheet --dir candidates
+node <skill>/scripts/curate-media.mjs fetch V1,T2 --dir assets --sheet
+node <skill>/scripts/curate-media.mjs fetch T2 --maps all --resolution 1k --dir assets
+```
+
+`--kind` 支持 `all|texture|design|photo|blueprint|map|plate|science|video`。信源是 Poly Haven、V&A、LOC、Wellcome 与 NASA；`all` 交错取各信源，`--limit` 是总结果数。Poly Haven 模型默认下载渲染预览，搜索另给 glTF 依赖清单，不是直接下载完整模型。
+
+搜索返回 JSON，`T/V/L/W/N` 编号依次对应五个信源，跨次搜索保存在当前目录 `.curate-cache.json`。后续命令使用同一目录或传同一个 `--cache <路径>`。正常零匹配与信源失败分开报告；部分成功保留有效结果并在 `errors` 中列出失败，全部信源失败或任一下载失败时返回码为 1。
+
+`search --sheet` 与 `preview` 制作远程候选联系表，`fetch --sheet` 制作本地联系表并检查解码与实际尺寸；视频下载自动尝试生成首帧 poster。完整解码与 poster 需要 ffmpeg/ffprobe，缺少时下载仍保留，并报告未完成项。依赖按调用需求检查，不自动安装。
+
+贴图默认下载 1k Diffuse；`--maps all` 下载 Diffuse、Roughness、OpenGL Normal JPG 并校验大小与 MD5。成功下载及 poster 自动写入同目录 `SOURCES.md`，已有素材文件不会覆盖。直接 URL 下载也支持 `fetch "<媒体 URL>" --out assets/<文件名> --note "来源说明"`，缺少权利资料时记为未核实；使用与许可见 [素材](media.md#真实贴图与科学工程素材)。全部选项与视频回退规则运行 `node <skill>/scripts/curate-media.mjs --help` 查看。
 
 ## 写可操作的小样
 

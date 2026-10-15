@@ -83,7 +83,7 @@ finally{clearTimeout(deadline);chrome.kill();}
         runner = runner.replace("#i18n-result", "#" + result_id)
         return subprocess.run([shutil.which("node"), "--input-type=module", "-e", runner, chrome,
                                str(self.folder / profile), self.output.as_uri()],
-                              capture_output=True, text=True, timeout=25)
+                              capture_output=True, text=True, timeout=25, encoding="utf-8")
 
     def test_lang_is_optional_and_preserved_when_explicit(self):
         builder.build(self.manifest, self.output)
@@ -124,7 +124,7 @@ finally{clearTimeout(deadline);chrome.kill();}
 
     def test_native_viewport_inheritance_override_and_identity(self):
         default = builder.build(self.manifest, self.output)
-        self.assertNotIn("nativeViewport", self.payload(self.output.read_text())["candidates"][0])
+        self.assertNotIn("nativeViewport", self.payload(self.output.read_text(encoding="utf-8"))["candidates"][0])
         self.data["nativeViewport"] = "1920x720"
         self.data["candidates"].extend([
             dict(self.data["candidates"][0], id="b", nativeViewport={"width": 1366, "height": 1024}),
@@ -132,7 +132,7 @@ finally{clearTimeout(deadline);chrome.kill();}
         ])
         self.save()
         result = builder.build(self.manifest, self.output, force=True)
-        candidates = self.payload(self.output.read_text())["candidates"]
+        candidates = self.payload(self.output.read_text(encoding="utf-8"))["candidates"]
         self.assertEqual([c["nativeViewport"] for c in candidates], [
             {"width": 1920, "height": 720}, {"width": 1366, "height": 1024}, {"width": 198, "height": 242}])
         self.assertNotEqual(result["fingerprint"], default["fingerprint"])
@@ -196,7 +196,7 @@ byId.a.nativeViewport={width:198,height:2000};fit(s);result.push({...m.style,sta
 box.dataset.zoom='actual';fit(s);result.push({...m.style,stage:{...s.style}});
 console.log(JSON.stringify(result));
 """
-        run = subprocess.run([shutil.which("node"), "-e", program], capture_output=True, text=True, timeout=10)
+        run = subprocess.run([shutil.which("node"), "-e", program], capture_output=True, text=True, timeout=10, encoding="utf-8")
         self.assertEqual(run.returncode, 0, run.stderr)
         results = json.loads(run.stdout)
         for result, (width, height, scale) in zip(results, [
@@ -245,7 +245,7 @@ console.log(JSON.stringify(result));
  out.textContent=JSON.stringify({cards,mobile,loupe,actual});document.body.append(out);
 })();
 </script>"""
-        self.output.write_text(self.output.read_text().replace("</body></html>", probe + "</body></html>"))
+        self.output.write_text(self.output.read_text(encoding="utf-8").replace("</body></html>", probe + "</body></html>"), encoding="utf-8")
         run = self.run_browser_probe("viewport-result", "chrome-native")
         self.assertEqual(run.returncode, 0, run.stderr)
         result = json.loads(run.stdout)
@@ -312,7 +312,11 @@ console.log(JSON.stringify(result));
                 program += "const no=c=>" + number_function + ";\nfunction copyText()" + copy_function
                 program += "\nresults.push({lang:LANG,text:copyText()});\n}\n"
         program += "console.log(JSON.stringify(results));"
-        run = subprocess.run([shutil.which("node"), "-e", program], capture_output=True, text=True, timeout=10)
+        # Passed as a file: the program is longer than a Windows command line may be.
+        with tempfile.TemporaryDirectory() as folder:
+            script = Path(folder) / "program.cjs"
+            script.write_text(program, encoding="utf-8")
+            run = subprocess.run([shutil.which("node"), str(script)], capture_output=True, text=True, encoding="utf-8", timeout=30)
         self.assertEqual(run.returncode, 0, run.stderr)
         results = iter(json.loads(run.stdout))
         for _, _, expected in cases:
@@ -370,7 +374,7 @@ console.log(JSON.stringify(result));
                 self.assertEqual(run.returncode, 0, run.stderr)
                 observed = json.loads(run.stdout)
                 self.assertEqual(observed["lang"], table[lang]["htmlLang"])
-                self.assertEqual(observed["title"], table[lang]["projectTitle"].replace("{project}", "Demo").replace("{edition}", " Pro" if builder.SKILL_ROOT.name == "oil-ui-pro" else ""))
+                self.assertEqual(observed["title"], table[lang]["projectTitle"].replace("{project}", "Demo").replace("{edition}", " Pro" if self.payload(page)["edition"] == "pro" else ""))
                 self.assertEqual(observed["initial"], {"loupe": True, "current": "b", "mobile": "true", "cards": 2, "descriptions": True})
                 self.assertEqual(set(observed["saved"]), {"layout", "viewport", "current", "chosen"})
                 self.assertEqual(observed["saved"]["chosen"], "b")
@@ -720,7 +724,7 @@ console.log(JSON.stringify(result));
                 (copy / "SKILL.md").write_text("---\nname: " + name + "\n---\n", encoding="utf-8")
                 output = self.folder / (edition + ".html")
                 run = subprocess.run([sys.executable, str(copy / "scripts/build_explorer.py"), str(self.manifest),
-                                      "--output", str(output)], cwd=self.folder, capture_output=True, text=True)
+                                      "--output", str(output)], cwd=self.folder, capture_output=True, text=True, encoding="utf-8")
                 self.assertEqual(run.returncode, 0, run.stderr)
                 page = output.read_text(encoding="utf-8")
                 self.assertEqual(self.payload(page)["edition"], edition)
@@ -734,7 +738,7 @@ console.log(JSON.stringify(result));
         copy = self.folder / "relocated"
         shutil.copytree(ROOT / "scripts", copy / "scripts", ignore=shutil.ignore_patterns("__pycache__"))
         shutil.copytree(ROOT / "assets", copy / "assets")
-        run = subprocess.run([sys.executable, str(copy / "scripts" / "build_explorer.py"), str(self.manifest), "--output", str(self.output)], cwd=self.folder, capture_output=True, text=True)
+        run = subprocess.run([sys.executable, str(copy / "scripts" / "build_explorer.py"), str(self.manifest), "--output", str(self.output)], cwd=self.folder, capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertTrue(self.output.is_file())
 
@@ -762,30 +766,30 @@ console.log(JSON.stringify(result));
         self.assertIn("候选 a：palette", str(caught.exception))
 
     def test_output_defaults_to_a_file_beside_the_manifest(self):
-        run = subprocess.run([sys.executable, str(ROOT / "scripts" / "build_explorer.py"), str(self.manifest)], capture_output=True, text=True)
+        run = subprocess.run([sys.executable, str(ROOT / "scripts" / "build_explorer.py"), str(self.manifest)], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(run.returncode, 0, run.stderr)
         expected = self.folder.resolve() / "style-explorer.html"
         self.assertEqual(Path(json.loads(run.stdout)["output"]), expected)
         self.assertTrue(expected.is_file())
-        again = subprocess.run([sys.executable, str(ROOT / "scripts" / "build_explorer.py"), str(self.manifest)], capture_output=True, text=True)
+        again = subprocess.run([sys.executable, str(ROOT / "scripts" / "build_explorer.py"), str(self.manifest)], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(again.returncode, 1)
         self.assertIn("--force", again.stderr)
 
     def test_missing_and_malformed_manifests_say_what_to_do(self):
         script = str(ROOT / "scripts" / "build_explorer.py")
-        missing = subprocess.run([sys.executable, script, str(self.folder / "nope.json")], capture_output=True, text=True)
+        missing = subprocess.run([sys.executable, script, str(self.folder / "nope.json")], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(missing.returncode, 1)
         self.assertIn("找不到 manifest", missing.stderr)
         self.assertNotIn("Errno", missing.stderr)
         broken = self.folder / "broken.json"
         broken.write_text('{"schemaVersion": 1,', encoding="utf-8")
-        malformed = subprocess.run([sys.executable, script, str(broken)], capture_output=True, text=True)
+        malformed = subprocess.run([sys.executable, script, str(broken)], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(malformed.returncode, 1)
         self.assertRegex(malformed.stderr, r"不是合法的 JSON：第 \d+ 行第 \d+ 列")
         self.assertNotIn("Traceback", malformed.stderr)
 
     def test_help_shows_a_complete_example(self):
-        run = subprocess.run([sys.executable, str(ROOT / "scripts" / "build_explorer.py"), "--help"], capture_output=True, text=True)
+        run = subprocess.run([sys.executable, str(ROOT / "scripts" / "build_explorer.py"), "--help"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(run.returncode, 0)
         for expected in ("manifest.json", '"schemaVersion": 1', "--force", "style-explorer.html"):
             self.assertIn(expected, run.stdout)

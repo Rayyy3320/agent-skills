@@ -2,10 +2,10 @@
 name: ui-design-guide
 description: "为 UI/UX 设计、视觉优化、截图还原和设计评审提供构图、层级、排版、交互与素材知识。需要这些设计判断时按问题选读参考；不用于纯业务逻辑、构建或无界面变化的代码整理。"
 metadata:
-  version: "0.22.1"
+  version: "0.23.0"
   upstream_skill: "oil-ui-pro"
-  upstream_version: "0.22.1"
-  compatibility: "设计参考与工具为宿主中立资源；截图和对比工具的依赖按需检查，独立评审需要已授权的隔离执行能力。"
+  upstream_version: "0.23.0"
+  compatibility: "设计参考为宿主中立资源；Python 生成工具需要 Python 3.10+，截图与素材工具需要 Node.js 22+，浏览器和 ffmpeg/ffprobe 按调用需要检查；独立评审需要已授权的隔离执行能力。"
 ---
 
 # UI Design Guide
@@ -23,12 +23,13 @@ metadata:
 | 当前问题 | 参考 |
 | --- | --- |
 | 新视觉方向或品牌表达 | [设计方向](references/design-direction.md)；说服型页面需要概念时读 [概念](references/direction-concept.md) |
+| 将首屏方向延续到整页、调整区块节奏或收尾 | [方向贯穿整页](references/direction-whole-page.md) |
 | 已有页面精修 | [整理已有页面](references/existing-polish.md)；涉及共享组件或规范时读 [存量项目](references/existing-project.md) |
 | 改流程或增加界面功能 | [存量流程](references/existing-project-workflow.md)、[交互与状态](references/interaction-and-state.md) |
 | 截图还原、布局、滚动或浮层 | [布局与视口](references/layout-and-viewport.md)、[空间与浮层](references/layout-surfaces.md) |
 | 字体、色彩、层级或细节 | [视觉语言](references/visual-language.md)、[视觉精修](references/visual-polish.md) |
 | 单个组件设计 | [组件](references/component.md) |
-| 摄影、插画、品牌素材或 3D | [素材](references/media.md) |
+| 摄影、插画、品牌素材、真实贴图或 3D | [素材](references/media.md)；需要检索与下载真实素材时读 [素材工具](references/tools.md#检索和下载真实素材) |
 | 交互反馈或动效 | [动效](references/motion.md)；确需滚动叙事时读 [滚动叙事](references/scroll-narrative.md) |
 | 用户要求并排比较 | [风格对比页](references/style-explorer.md) |
 | 截图、录屏或对比工具的具体用法 | [工具](references/tools.md) |
@@ -43,6 +44,7 @@ metadata:
 - 多方向比较仅在用户要求或重要分歧确需画面判断时使用；不固定候选数量。
 - 独立评审仅在用户要求或已授权且能解决重要不确定性时使用；评分不作为默认完成阈值。
 - `--evidence` 全套取证仅在明确要求完整证据包时使用。局部修改、普通评审和交付无需自动录屏、遮字图、200% 图或全状态截图。
+- 真实素材检索与下载按内容需要使用；Node.js 22+、浏览器与 ffmpeg/ffprobe 等依赖按实际调用的工具检查，优先复用已有能力。
 - 当前目标达到后交付，不把可选提升变成必做任务；只说明实际结果、必要验证和有实质影响的未验证项。
 
-本 Skill 是基于 Oil UI Pro 的本地定制版。官方更新保留在独立的 `oil-ui-pro` 原版目录；需要同步上游知识时对比后定向合入，不使用原版更新器覆盖本目录。
+本 Skill 定向合入 Oil UI Pro 0.23.0 的设计知识与工具修复，保留本地轻量工作方式。官方更新保留在独立的 `oil-ui-pro` 原版目录；需要同步上游知识时对比后定向合入，不使用原版更新器覆盖本目录。

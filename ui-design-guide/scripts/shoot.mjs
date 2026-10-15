@@ -349,7 +349,9 @@ function findChrome() {
     win32: [
       `${process.env["PROGRAMFILES"]}\\Google\\Chrome\\Application\\chrome.exe`,
       `${process.env["PROGRAMFILES(X86)"]}\\Google\\Chrome\\Application\\chrome.exe`,
+      `${process.env["LOCALAPPDATA"]}\\Google\\Chrome\\Application\\chrome.exe`,
       `${process.env["PROGRAMFILES(X86)"]}\\Microsoft\\Edge\\Application\\msedge.exe`,
+      `${process.env["PROGRAMFILES"]}\\Microsoft\\Edge\\Application\\msedge.exe`,
     ],
   }[process.platform];
   for (const c of candidates || []) if (c && existsSync(c)) return c;
@@ -361,35 +363,82 @@ function findChrome() {
 }
 
 const chromePath = findChrome();
-let profile, chrome, cleaning;
+let profile, chrome, cleaning, ws, handedOff;
+// 启动的那个进程不一定是真正的浏览器：有的版本把浏览器交给另一个进程后自己退出。
+// 所以关闭时先让浏览器自己退出，再按本次临时目录的名字找还活着的进程。
+function closeBrowser() {
+  return new Promise((ok) => {
+    const socket = ws, timer = setTimeout(() => ok(false), 3000);
+    socket.onerror = null; socket.onclose = () => { clearTimeout(timer); ok(true); };
+    try { socket.send(JSON.stringify({ id: 2147483647, method: "Browser.close" })); } catch { clearTimeout(timer); ok(false); }
+  });
+}
+function profileProcesses() {
+  const name = basename(profile);
+  if (process.platform === "win32") {
+    const script = `Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -and $_.CommandLine.Contains('${name}') } | ForEach-Object { $_.ProcessId }`;
+    const r = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { encoding: "utf8", timeout: 20000, windowsHide: true });
+    return (r.stdout || "").split(/\s+/).map(Number).filter((pid) => pid && pid !== process.pid);
+  }
+  const r = spawnSync("ps", ["-axww", "-o", "pid=,command="], { encoding: "utf8", timeout: 10000 });
+  return (r.stdout || "").split("\n").filter((line) => line.includes(name)).map((line) => Number(line.trim().split(/\s+/)[0])).filter((pid) => pid && pid !== process.pid);
+}
+function killProfileProcesses() {
+  // 查两遍：第一遍之后才冒出来的子进程也要关掉。
+  for (let pass = 0; pass < 2; pass++) {
+    const pids = profileProcesses(); if (!pids.length) return;
+    for (const pid of pids) { try { process.kill(pid, "SIGKILL"); } catch {} }
+  }
+}
+function removeProfile(closed) {
+  if (!profile) return;
+  const remove = (maxRetries) => rmSync(profile, { recursive: true, force: true, maxRetries, retryDelay: 100 });
+  try {
+    // 浏览器不是启动的那个进程时，连接断开不等于它已经退出，等不到它的退出事件，直接按目录名收尾。
+    if (!closed || handedOff) killProfileProcesses();
+    try { remove(5); } catch { killProfileProcesses(); remove(10); }
+  } catch (error) { console.error(`shoot：临时目录没删掉（${error.code || error.message}），可以稍后手动删除：${profile}`); }
+  profile = undefined;
+}
 async function stopChrome() {
+  const closed = ws?.readyState === WebSocket.OPEN ? await closeBrowser() : false;
   if (chrome && chrome.exitCode === null && chrome.signalCode === null) await new Promise((ok) => {
     const timer = setTimeout(() => { chrome.kill("SIGKILL"); ok(); }, 3000);
     chrome.once("close", () => { clearTimeout(timer); ok(); }); chrome.kill();
   });
-  if (profile) rmSync(profile, { recursive: true, force: true });
+  removeProfile(closed);
 }
 function cleanup() { return cleaning ||= (async () => { for (const child of encoders) child.kill("SIGKILL"); await stopChrome(); server?.close(); removeFrames(); })(); }
 process.on("exit", () => {
   try { for (const child of encoders) child.kill("SIGKILL"); removeFrames(); } catch {}
   try { chrome?.kill(); } catch {}
   try { server?.close(); } catch {}
-  try { if (profile) rmSync(profile, { recursive: true, force: true }); } catch {}
+  try { removeProfile(false); } catch {}
 });
 process.on("SIGINT", async () => { await cleanup(); process.exit(130); });
 process.on("SIGTERM", async () => { await cleanup(); process.exit(143); });
 async function launchChrome() {
-  profile = mkdtempSync(join(tmpdir(), "oil-shoot-"));
+  profile = mkdtempSync(join(tmpdir(), "oil-shoot-")); handedOff = false;
   chrome = spawn(chromePath, ["--headless=new", "--enable-unsafe-swiftshader", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run",
     "--no-default-browser-check", "--hide-scrollbars", "--mute-audio", "--disable-extensions", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+  const portFile = join(profile, "DevToolsActivePort");
+  const fromPortFile = () => {
+    try {
+      const [port, path] = readFileSync(portFile, "utf8").split("\n").map((line) => line.trim());
+      return /^\d+$/.test(port) && path?.startsWith("/devtools/browser/") ? `ws://127.0.0.1:${port}${path}` : null;
+    } catch { return null; }
+  };
   return new Promise((ok, no) => {
-    let buf = "";
+    let buf = "", exited;
     const timer = setTimeout(() => finish(new Error("timeout")), timeoutMs(45000));
+    const poll = setInterval(() => { const url = fromPortFile(); if (url) finish(null, url); }, 100);
     const onData = (d) => { buf += d; const m = buf.match(/DevTools listening on (ws:\/\/\S+)/); if (m) finish(null, m[1]); };
     const onError = (e) => finish(e);
-    const onExit = () => finish(new Error("浏览器提前退出"));
+    // 浏览器可能已经交给另一个进程，端口文件稍后才出现，所以不马上判失败。
+    const onExit = () => { handedOff = true; exited = setTimeout(() => finish(new Error("浏览器提前退出")), timeoutMs(10000)); };
     function finish(error, url) {
-      clearTimeout(timer); chrome.stderr.off("data", onData); chrome.off("error", onError); chrome.off("exit", onExit);
+      clearTimeout(timer); clearTimeout(exited); clearInterval(poll);
+      chrome.stderr.off("data", onData); chrome.off("error", onError); chrome.off("exit", onExit);
       error ? no(error) : ok(url);
     }
     chrome.stderr.on("data", onData); chrome.once("error", onError); chrome.once("exit", onExit);
@@ -411,7 +460,7 @@ async function during(context, work) {
   const previous = currentContext; currentContext = context;
   try { return await work(); } finally { currentContext = previous; }
 }
-let ws, sessionId, browserNeedsRestart = false;
+let sessionId, browserNeedsRestart = false;
 let seq = 0;
 const pending = new Map(), listeners = [];
 let saveFatalReport = () => {};
@@ -534,7 +583,9 @@ async function open(url, wait = Number(opt.wait)) {
       timer = setTimeout(ok, timeoutMs(15000));
     });
     try {
-      const nav = await cdp("Page.navigate", { url });
+      let nav = await cdp("Page.navigate", { url });
+      // 被取消不等于打不开：浏览器自己的导航偶尔会打断这一次（Edge 的新配置上见过），等一下再试一次。
+      if (nav.errorText === "net::ERR_ABORTED") { await sleep(300); nav = await cdp("Page.navigate", { url }); }
       if (nav.errorText) throw new Error(`打不开 ${url}：${nav.errorText}`);
       await loaded;
       await evaluate(`document.fonts ? document.fonts.ready.then(() => true) : true`);
@@ -683,26 +734,48 @@ function lintPage() {
     if (above >= 0 && below >= 12 && above + 4 < below) add("headingSpacing", h, "上 " + Math.round(above) + "px，下 " + Math.round(below) + "px");
   }
 
+  const hasCurrentSemantics = (n) => {
+    if (!n) return false;
+    const ariaCurrent = typeof n.getAttribute === "function" ? n.getAttribute("aria-current") : null;
+    if (ariaCurrent && ariaCurrent !== "false") return true;
+    const ariaSelected = typeof n.getAttribute === "function" ? n.getAttribute("aria-selected") : null;
+    if (ariaSelected === "true") return true;
+    if (typeof n.matches === "function" && n.matches("[aria-current]:not([aria-current='false']),[aria-selected='true']")) return true;
+    const cls = typeof n.className === "string" ? n.className : "";
+    return /\b(is-)?(active|current|selected)\b/i.test(cls);
+  };
+  const isNavCurrent = (node) => {
+    if (!node.closest("nav,[role='navigation'],[role='tablist']")) return false;
+    if (hasCurrentSemantics(node)) return true;
+    if (node.tagName === "LI" && typeof node.querySelector === "function") {
+      return hasCurrentSemantics(node.querySelector("a,button,[role='tab'],[role='menuitem']"));
+    }
+    return false;
+  };
+
   for (const el of all) {
     const s = css(el);
     if (s.display === "none") continue;
     const r = el.getBoundingClientRect();
     if (!r.width || !r.height) continue;
 
-    // 单侧彩色边线：边框或贴边的伪元素，中性色的结构分隔线不算
-    const sides = { left: parseFloat(s.borderLeftWidth), right: parseFloat(s.borderRightWidth), top: parseFloat(s.borderTopWidth), bottom: parseFloat(s.borderBottomWidth) };
-    for (const side of ["left", "right"]) {
-      const w = sides[side], others = Math.max(sides[side === "left" ? "right" : "left"], sides.top, sides.bottom);
-      const c = rgba(s[side === "left" ? "borderLeftColor" : "borderRightColor"]);
-      if (w >= 2 && w >= others * 2 && /solid|double/.test(s[side === "left" ? "borderLeftStyle" : "borderRightStyle"])
-        && c.a >= 0.4 && chroma(c) >= 0.15 && r.height >= 16 && r.width > sides.left + sides.right + 24 && r.height < innerHeight * 0.8) add("sideStripe", el, w + "px");
-    }
-    for (const pseudo of ["::before", "::after"]) {
-      const p = css(el, pseudo);
-      if (p.content === "none" || p.position !== "absolute") continue;
-      const pw = parseFloat(p.width), ph = parseFloat(p.height), c = rgba(p.backgroundColor);
-      if (pw >= 2 && pw <= 8 && ph >= r.height * 0.6 && r.height >= 24 && r.width > 60 && c.a >= 0.4 && chroma(c) >= 0.15
-        && (parseFloat(p.left) <= 2 || parseFloat(p.right) <= 2)) add("sideStripe", el, pseudo);
+    // 单侧彩色边线：边框或贴边的伪元素，中性色的结构分隔线、blockquote 引文、导航当前选中指示不算
+    const isQuoteOrNav = el.matches("blockquote") || isNavCurrent(el);
+    if (!isQuoteOrNav) {
+      const sides = { left: parseFloat(s.borderLeftWidth), right: parseFloat(s.borderRightWidth), top: parseFloat(s.borderTopWidth), bottom: parseFloat(s.borderBottomWidth) };
+      for (const side of ["left", "right"]) {
+        const w = sides[side], others = Math.max(sides[side === "left" ? "right" : "left"], sides.top, sides.bottom);
+        const c = rgba(s[side === "left" ? "borderLeftColor" : "borderRightColor"]);
+        if (w >= 2 && w >= others * 2 && /solid|double/.test(s[side === "left" ? "borderLeftStyle" : "borderRightStyle"])
+          && c.a >= 0.4 && chroma(c) >= 0.15 && r.height >= 16 && r.width > sides.left + sides.right + 24 && r.height < innerHeight * 0.8) add("sideStripe", el, w + "px");
+      }
+      for (const pseudo of ["::before", "::after"]) {
+        const p = css(el, pseudo);
+        if (p.content === "none" || p.position !== "absolute") continue;
+        const pw = parseFloat(p.width), ph = parseFloat(p.height), c = rgba(p.backgroundColor);
+        if (pw >= 2 && pw <= 8 && ph >= r.height * 0.6 && r.height >= 24 && r.width > 60 && c.a >= 0.4 && chroma(c) >= 0.15
+          && (parseFloat(p.left) <= 2 || parseFloat(p.right) <= 2)) add("sideStripe", el, pseudo);
+      }
     }
 
     if (/text/.test(s.backgroundClip + " " + s.getPropertyValue("-webkit-background-clip")) && /gradient/.test(s.backgroundImage) && (el.textContent || "").trim()) add("gradientText", el);
@@ -766,6 +839,40 @@ function lintPage() {
     if (labels.length >= 2) labels.forEach((el) => add("englishLabel", el));
   }
 
+  const isAncestor = (anc, node) => {
+    for (let p = node; p; p = p.parentElement) if (p === anc) return true;
+    return false;
+  };
+  const containingRect = (node, pos) => {
+    if (pos === "fixed") return { left: 0, top: 0 };
+    for (let p = node; p && p.nodeType === 1; p = p.parentElement) {
+      if (css(p).position !== "static") return p.getBoundingClientRect();
+    }
+    return document.documentElement?.getBoundingClientRect?.() || { left: 0, top: 0 };
+  };
+  const hasOverlayPlate = (el, r) => {
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    for (let node = el; node && node.nodeType === 1; node = node.parentElement) {
+      for (const pseudo of ["::before", "::after"]) {
+        const ps = css(node, pseudo);
+        if (!ps || !ps.content || ps.content === "none" || !(ps.backgroundImage !== "none" || rgba(ps.backgroundColor).a > 0.05)) continue;
+        const pw = parseFloat(ps.width), ph = parseFloat(ps.height);
+        if (!(pw >= r.width * 0.5 && ph >= r.height * 0.5)) continue;
+        const base = (ps.position === "absolute" || ps.position === "fixed") ? containingRect(node, ps.position) : node.getBoundingClientRect();
+        const pl = base.left + (parseFloat(ps.left) || 0), pt = base.top + (parseFloat(ps.top) || 0);
+        if (cx >= pl && cx <= pl + pw && cy >= pt && cy <= pt + ph) return true;
+      }
+      if (rgba(css(node).backgroundColor).a >= 0.99) break;
+    }
+    return all.some((other) => {
+      if (other === el || isAncestor(other, el) || isAncestor(el, other)) return false;
+      const or = other.getBoundingClientRect();
+      if (cx < or.left || cx > or.right || cy < or.top || cy > or.bottom) return false;
+      const os = css(other);
+      return os.backgroundImage !== "none" || rgba(os.backgroundColor).a > 0.05;
+    });
+  };
+
   for (const el of texts) {
     const s = css(el), r = el.getBoundingClientRect();
     if (el.closest("button:disabled,[disabled],[aria-disabled='true'],input,textarea,select,option")) continue;
@@ -778,10 +885,11 @@ function lintPage() {
       const color = over({ ...fg, a: fg.a * alpha }, bg);
       const contrast = ratio(color, bg);
       const large = size >= 24 || (size >= 18.6 && parseInt(s.fontWeight, 10) >= 700);
-      // 低于 1.5:1 时文字几乎看不见，多半是文字后面还垫着一层查不到的元素（滑块、绝对定位的底板），不报
-      if (contrast < 1.5) continue;
-      if (contrast < (large ? 3 : 4.5)) add("contrastLow", el, contrast.toFixed(2) + ":1");
-      else if (chroma(bg) >= 0.25 && chroma(color) < 0.06 && luminance(color) > 0.08 && luminance(color) < 0.6) add("grayOnColor", el);
+      // 低于 1.5:1 且背后垫着非祖先底板或伪元素（滑块、绝对定位胶囊）时，不误报对比度；确定底色上的极低对比度照常报错
+      if (!(contrast < 1.5 && hasOverlayPlate(el, r))) {
+        if (contrast < (large ? 3 : 4.5)) add("contrastLow", el, contrast.toFixed(2) + ":1");
+        else if (chroma(bg) >= 0.25 && chroma(color) < 0.06 && luminance(color) > 0.08 && luminance(color) < 0.6) add("grayOnColor", el);
+      }
     }
     // 正文：两行以上的段落
     const text = ownText(el);
@@ -1283,7 +1391,8 @@ async function record(url, w, h, { steps = [], name = "", entry = flags.has("ent
     await setViewport(w, h, zoom);
     ({ identifier } = await cdp("Page.addScriptToEvaluateOnNewDocument", { source: `(${recordTiming.toString()})()` }));
     if (entry) {
-      await open("about:blank", 0);
+      // 起始的空白页自己写明白底：系统是深色主题时，浏览器会把 about:blank 画成深灰，同一段录屏换台机器开头就不一样。
+      await open("data:text/html,<html style='background:%23fff'>", 0);
       // Seed the video with a painted blank page, never the preceding evidence item.
       frames.push(await captureFrame("blank"));
     } else await open(url);
@@ -1714,8 +1823,7 @@ for (const l of lines) console.log(`- ${l}`);
 const total = report.reduce((n, r) => n + r.issues.length, 0);
 if (report.length) console.log(total ? `发现 ${total} 个问题，详见 report.json` : `检查通过：没有控制台错误、横向溢出或加载失败的图片${flags.has("motion") ? "，三段动效都检测到了" : ""}`);
 const hinted = [...new Set(report.flatMap((r) => (r.lint || []).map((i) => i.label)))];
-if (hinted.length) console.log(`默认做法提示 ${hinted.length} 类：${hinted.join("、")}。可读性几项（对比度不达标、正文小于 13px、行高过紧、停在透明）要改；其余改掉，或在交付说明里写出它怎样服务方向，误报也写一句。详见 report.json 的 lint`);
+if (hinted.length) console.log(`默认做法提示 ${hinted.length} 类：${hinted.join("、")}。核实并修复影响本次目标的可读性问题；风格提示按产品依据判断，不以清零为完成标准。详见 report.json 的 lint`);
 finishing = true;
-ws.close();
 await cleanup();
 process.exit(process.exitCode || 0);
